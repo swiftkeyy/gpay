@@ -1,94 +1,128 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from decimal import Decimal
+from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import DiscountRule, Price, Product, PromoCode, User
-from app.models.enums import DiscountScope, PromoType
-from app.repositories.catalog import PriceRepository
+from app.models import Price, Product, PromoCode, PromoType, User
 
 
 @dataclass(slots=True)
-class PriceQuote:
+class PriceCalculationResult:
     base_price: Decimal
-    discount_amount: Decimal
+    product_discount_amount: Decimal
+    promo_discount_amount: Decimal
+    personal_discount_amount: Decimal
     final_price: Decimal
     currency_code: str
-    applied_rules: list[str]
+    applied_promo_code: str | None = None
+    details: dict[str, Any] | None = None
 
 
 class PricingService:
-    def __init__(self, session: AsyncSession):
-        self.session = session
-        self.price_repo = PriceRepository(session)
-
-    async def get_product_price(self, product: Product, user: User | None = None, promo: PromoCode | None = None) -> PriceQuote:
-        price = await self.price_repo.get_current_for_product(product.id)
-        if price is None:
-            base = Decimal('0.00')
-            currency = 'RUB'
-        else:
-            base = Decimal(price.discounted_price or price.base_price)
-            currency = price.currency_code
-
-        applied_rules: list[str] = []
-        discount_amount = Decimal('0.00')
-        discount_amount += await self._apply_discount_rules(product, base, applied_rules, user)
-
-        if user and user.personal_discount_percent > 0:
-            personal_discount = (base * Decimal(user.personal_discount_percent) / Decimal('100')).quantize(Decimal('0.01'))
-            if personal_discount > discount_amount:
-                discount_amount = personal_discount
-                applied_rules.append(f'personal:{user.personal_discount_percent}%')
-
-        if promo:
-            promo_discount = self._promo_discount(base, promo)
-            if promo_discount > discount_amount:
-                discount_amount = promo_discount
-                applied_rules.append(f'promo:{promo.code}')
-
-        final_price = max(Decimal('0.00'), base - discount_amount)
-        return PriceQuote(base_price=base, discount_amount=discount_amount, final_price=final_price, currency_code=currency, applied_rules=applied_rules)
-
-    async def _apply_discount_rules(self, product: Product, base: Decimal, applied: list[str], user: User | None) -> Decimal:
-        now = datetime.now(timezone.utc)
-        stmt = (
-            select(DiscountRule)
-            .where(DiscountRule.is_deleted.is_(False), DiscountRule.is_active.is_(True))
-            .order_by(DiscountRule.priority.asc(), DiscountRule.id.asc())
+    async def get_active_price(
+        self,
+        session: AsyncSession,
+        product_id: int,
+    ) -> Price | None:
+        result = await session.execute(
+            select(Price)
+            .where(
+                Price.product_id == product_id,
+                Price.is_active.is_(True),
+            )
+            .order_by(Price.id.desc())
         )
-        rules = list(await self.session.scalars(stmt))
-        best = Decimal('0.00')
-        for rule in rules:
-            if rule.starts_at and rule.starts_at > now:
-                continue
-            if rule.ends_at and rule.ends_at < now:
-                continue
-            if rule.scope == DiscountScope.GLOBAL:
-                pass
-            elif rule.scope == DiscountScope.GAME and rule.game_id != product.game_id:
-                continue
-            elif rule.scope == DiscountScope.PRODUCT and rule.product_id != product.id:
-                continue
-            elif rule.scope == DiscountScope.PERSONAL and (user is None or rule.user_id != user.id):
-                continue
-            elif rule.scope == DiscountScope.ACCUMULATIVE and (user is None):
-                continue
-            candidate = Decimal('0.00')
-            if rule.percent:
-                candidate = (base * Decimal(rule.percent) / Decimal('100')).quantize(Decimal('0.01'))
-            elif rule.fixed_amount:
-                candidate = Decimal(rule.fixed_amount)
-            if candidate > best:
-                best = candidate
-                applied.append(f'rule:{rule.title}')
-        return best
+        return result.scalars().first()
 
-    def _promo_discount(self, base: Decimal, promo: PromoCode) -> Decimal:
-        if promo.promo_type == PromoType.PERCENT:
-            return (base * Decimal(promo.value) / Decimal('100')).quantize(Decimal('0.01'))
-        return min(base, Decimal(promo.value))
+    async def calculate_product_price(
+        self,
+        session: AsyncSession,
+        *,
+        product: Product,
+        user: User | None = None,
+        promo_code: PromoCode | None = None,
+        quantity: int = 1,
+    ) -> PriceCalculationResult:
+        if quantity < 1:
+            quantity = 1
+
+        active_price = await self.get_active_price(session, product.id)
+        if active_price is None:
+            raise ValueError("Active price for product not found")
+
+        base_unit_price = Decimal(active_price.base_price)
+        currency_code = active_price.currency_code
+
+        discounted_unit_price = (
+            Decimal(active_price.discounted_price)
+            if active_price.discounted_price is not None
+            else base_unit_price
+        )
+
+        product_discount_amount = (base_unit_price - discounted_unit_price) * quantity
+        subtotal_after_product_discount = discounted_unit_price * quantity
+
+        personal_discount_amount = Decimal("0.00")
+        if user and getattr(user, "personal_discount_percent", 0):
+            percent = Decimal(user.personal_discount_percent) / Decimal("100")
+            personal_discount_amount = (subtotal_after_product_discount * percent).quantize(Decimal("0.01"))
+
+        subtotal_after_personal = subtotal_after_product_discount - personal_discount_amount
+        if subtotal_after_personal < Decimal("0.00"):
+            subtotal_after_personal = Decimal("0.00")
+
+        promo_discount_amount = Decimal("0.00")
+        applied_promo_code: str | None = None
+
+        if promo_code and getattr(promo_code, "is_active", False):
+            if promo_code.promo_type == PromoType.PERCENT:
+                percent = Decimal(promo_code.value) / Decimal("100")
+                promo_discount_amount = (subtotal_after_personal * percent).quantize(Decimal("0.01"))
+            elif promo_code.promo_type == PromoType.FIXED:
+                promo_discount_amount = Decimal(promo_code.value).quantize(Decimal("0.01"))
+
+            if promo_discount_amount > subtotal_after_personal:
+                promo_discount_amount = subtotal_after_personal
+
+            applied_promo_code = promo_code.code
+
+        final_price = subtotal_after_personal - promo_discount_amount
+        if final_price < Decimal("0.00"):
+            final_price = Decimal("0.00")
+
+        return PriceCalculationResult(
+            base_price=(base_unit_price * quantity).quantize(Decimal("0.01")),
+            product_discount_amount=product_discount_amount.quantize(Decimal("0.01")),
+            promo_discount_amount=promo_discount_amount.quantize(Decimal("0.01")),
+            personal_discount_amount=personal_discount_amount.quantize(Decimal("0.01")),
+            final_price=final_price.quantize(Decimal("0.01")),
+            currency_code=currency_code,
+            applied_promo_code=applied_promo_code,
+            details={
+                "product_id": product.id,
+                "quantity": quantity,
+                "base_unit_price": str(base_unit_price),
+                "discounted_unit_price": str(discounted_unit_price),
+            },
+        )
+
+    async def calculate_cart_item_price(
+        self,
+        session: AsyncSession,
+        *,
+        product: Product,
+        quantity: int,
+        user: User | None = None,
+        promo_code: PromoCode | None = None,
+    ) -> PriceCalculationResult:
+        return await self.calculate_product_price(
+            session,
+            product=product,
+            user=user,
+            promo_code=promo_code,
+            quantity=quantity,
+        )
