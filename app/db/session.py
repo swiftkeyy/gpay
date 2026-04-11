@@ -27,6 +27,8 @@ session_factory = async_sessionmaker(
     autocommit=False,
 )
 
+SessionLocal = session_factory
+
 
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with session_factory() as session:
