@@ -7,7 +7,7 @@ from app.models import AuditLog, BotSetting, Broadcast, Referral, ReferralReward
 from app.repositories.base import BaseRepository
 
 
-class SettingsRepository(BaseRepository[BotSetting]):
+class BotSettingRepository(BaseRepository[BotSetting]):
     model = BotSetting
 
     async def get_by_key(self, session: AsyncSession, key: str) -> BotSetting | None:
@@ -43,6 +43,10 @@ class SettingsRepository(BaseRepository[BotSetting]):
         session.add(setting)
         await session.flush()
         return setting
+
+
+class SettingsRepository(BotSettingRepository):
+    pass
 
 
 class BroadcastRepository(BaseRepository[Broadcast]):
