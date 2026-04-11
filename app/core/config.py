@@ -13,15 +13,17 @@ class Settings(BaseSettings):
 
     bot_token: str = Field(..., alias="BOT_TOKEN")
 
-    db_host: str = Field("db", alias="POSTGRES_HOST")
+    db_host: str = Field("localhost", alias="POSTGRES_HOST")
     db_port: int = Field(5432, alias="POSTGRES_PORT")
     db_name: str = Field("game_pay", alias="POSTGRES_DB")
     db_user: str = Field("game_pay", alias="POSTGRES_USER")
     db_password: str = Field("game_pay", alias="POSTGRES_PASSWORD")
+    db_ssl_mode: str = Field("require", alias="POSTGRES_SSL_MODE")
 
-    redis_host: str = Field("redis", alias="REDIS_HOST")
+    redis_host: str = Field("localhost", alias="REDIS_HOST")
     redis_port: int = Field(6379, alias="REDIS_PORT")
     redis_db: int = Field(0, alias="REDIS_DB")
+    redis_password: str | None = Field(None, alias="REDIS_PASSWORD")
 
     shop_name: str = Field("Game Pay", alias="SHOP_NAME")
     super_admin_tg_id: int = Field(0, alias="SUPER_ADMIN_TG_ID")
@@ -32,6 +34,7 @@ class Settings(BaseSettings):
         return (
             f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"?ssl={self.db_ssl_mode}"
         )
 
     @property
@@ -39,10 +42,13 @@ class Settings(BaseSettings):
         return (
             f"postgresql+psycopg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
+            f"?sslmode={self.db_ssl_mode}"
         )
 
     @property
     def redis_url(self) -> str:
+        if self.redis_password:
+            return f"redis://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
         return f"redis://{self.redis_host}:{self.redis_port}/{self.redis_db}"
 
 
