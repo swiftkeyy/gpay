@@ -22,15 +22,13 @@ async def _render_home(
     session: AsyncSession,
     db_user: User,
 ) -> None:
-    settings_service = SettingsService()
+    settings_service = SettingsService(session)
 
     welcome = await settings_service.get(
-        session,
         "welcome_text",
         "Добро пожаловать в Game Pay.",
     )
     shop_name = await settings_service.get(
-        session,
         "shop_name",
         "Game Pay",
     )
