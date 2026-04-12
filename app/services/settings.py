@@ -1,28 +1,24 @@
 from __future__ import annotations
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.repositories.settings import BotSettingRepository
 
 
 class SettingsService:
-    def __init__(self, repo: BotSettingRepository | None = None) -> None:
-        self.repo = repo or BotSettingRepository()
+    def __init__(self, session) -> None:
+        self.repo = BotSettingRepository(session)
 
     async def get(
         self,
-        session: AsyncSession,
         key: str,
         default: str | None = None,
     ) -> str | None:
-        setting = await self.repo.get_by_key(session, key)
+        setting = await self.repo.get_by_key(key)
         if setting is None:
             return default
         return setting.value
 
     async def set(
         self,
-        session: AsyncSession,
         *,
         key: str,
         value: str,
@@ -30,7 +26,6 @@ class SettingsService:
         is_public: bool = False,
     ) -> str:
         setting = await self.repo.set_value(
-            session,
             key=key,
             value=value,
             description=description,
