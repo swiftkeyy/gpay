@@ -108,6 +108,32 @@ def product_kb(product_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def orders_kb(orders: list | None = None) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    orders = orders or []
+
+    for order in orders:
+        order_id = _safe_id(order)
+        order_number = getattr(order, "order_number", f"#{order_id}")
+        builder.button(text=f"📦 {order_number}", callback_data=f"order:{order_id}")
+
+    if orders:
+        builder.adjust(1)
+
+    builder.button(text="🔙 В меню", callback_data=NavCb(target="home").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def order_actions_kb(order_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔄 Повторить заказ", callback_data=f"order:repeat:{order_id}")
+    builder.button(text="🕘 История статусов", callback_data=f"order:history:{order_id}")
+    builder.button(text="🔙 К заказам", callback_data=NavCb(target="orders").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def _extract_cart_items(cart_or_items) -> list:
     if cart_or_items is None:
         return []
