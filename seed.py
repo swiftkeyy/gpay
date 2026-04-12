@@ -268,19 +268,32 @@ async def set_setting(session, *, key: str, value: str, description: str, is_pub
 async def seed() -> None:
     async with SessionLocal() as session:
         super_user = await get_or_create_user(
-            session,
-            telegram_id=settings.super_admin_tg_id,
-            username="super_admin",
-            first_name="Super",
-            last_name="Admin",
-        )
-        admin_user = await get_or_create_user(
-            session,
-            telegram_id=settings.second_admin_tg_id,
-            username="admin",
-            first_name="Admin",
-            last_name="Manager",
-        )
+        session,
+        telegram_id=settings.super_admin_tg_id,
+        username="super_admin",
+        first_name="Super",
+        last_name="Admin",
+    )
+    
+    admin_user = await get_or_create_user(
+        session,
+        telegram_id=settings.second_admin_tg_id,
+        username="admin",
+        first_name="Admin",
+        last_name="Manager",
+    )
+    
+    await get_or_create_admin(
+        session,
+        user=super_user,
+        role=AdminRole.SUPER_ADMIN,
+    )
+    
+    await get_or_create_admin(
+        session,
+        user=admin_user,
+        role=AdminRole.ADMIN,
+    )
 
         super_admin = await get_or_create_admin(session, user=super_user, role=AdminRole.SUPER_ADMIN)
         await get_or_create_admin(session, user=admin_user, role=AdminRole.ADMIN)
