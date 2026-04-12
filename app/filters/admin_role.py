@@ -7,12 +7,17 @@ from app.models import Admin
 from app.services.rbac import RBACService
 
 
-class AdminRoleFilter(BaseFilter):
+class AdminPermissionFilter(BaseFilter):
     def __init__(self, permission: str) -> None:
         self.permission = permission
         self.rbac = RBACService()
 
-    async def __call__(self, event: Message | CallbackQuery, admin: Admin | None = None, **kwargs) -> bool:
+    async def __call__(
+        self,
+        event: Message | CallbackQuery,
+        admin: Admin | None = None,
+        **kwargs,
+    ) -> bool:
         if admin is None:
             return False
 
@@ -23,3 +28,7 @@ class AdminRoleFilter(BaseFilter):
             self.permission,
             can_manage_categories=can_manage_categories,
         )
+
+
+class AdminRoleFilter(AdminPermissionFilter):
+    pass
