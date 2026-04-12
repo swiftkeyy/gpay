@@ -69,6 +69,17 @@ def games_admin_kb(games: list | None = None) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def game_actions_kb(game_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Редактировать", callback_data=f"adm:game_edit:{game_id}")
+    builder.button(text="🗂 Категории", callback_data=f"adm:game_categories:{game_id}")
+    builder.button(text="🛍 Товары", callback_data=f"adm:game_products:{game_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"adm:game_del:{game_id}")
+    builder.button(text="🔙 К играм", callback_data=NavCb(target="admin_games").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def categories_admin_kb(categories: list | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     categories = categories or []
@@ -86,6 +97,16 @@ def categories_admin_kb(categories: list | None = None) -> InlineKeyboardMarkup:
     builder.button(text="➕ Добавить категорию", callback_data="adm:cat_add")
     builder.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
     builder.adjust(1, 1)
+    return builder.as_markup()
+
+
+def category_actions_kb(category_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Редактировать", callback_data=f"adm:cat_edit:{category_id}")
+    builder.button(text="🛍 Товары", callback_data=f"adm:cat_products:{category_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"adm:cat_del:{category_id}")
+    builder.button(text="🔙 К категориям", callback_data=NavCb(target="admin_categories").pack())
+    builder.adjust(1)
     return builder.as_markup()
 
 
@@ -109,6 +130,17 @@ def products_admin_kb(products: list | None = None) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def product_actions_kb(product_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Редактировать", callback_data=f"adm:prod_edit:{product_id}")
+    builder.button(text="💸 Цена", callback_data=f"adm:price:{product_id}")
+    builder.button(text="🖼 Картинка", callback_data=f"adm:prod_media:{product_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"adm:prod_del:{product_id}")
+    builder.button(text="🔙 К товарам", callback_data=NavCb(target="admin_products").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def prices_admin_kb(products: list | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     products = products or []
@@ -122,6 +154,14 @@ def prices_admin_kb(products: list | None = None) -> InlineKeyboardMarkup:
         builder.adjust(1)
 
     builder.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def price_actions_kb(product_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Изменить цену", callback_data=f"adm:price_edit:{product_id}")
+    builder.button(text="🔙 К ценам", callback_data=NavCb(target="admin_prices").pack())
     builder.adjust(1)
     return builder.as_markup()
 
@@ -146,6 +186,15 @@ def promos_admin_kb(promos: list | None = None) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def promo_actions_kb(promo_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✏️ Редактировать", callback_data=f"adm:promo_edit:{promo_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"adm:promo_del:{promo_id}")
+    builder.button(text="🔙 К промокодам", callback_data=NavCb(target="admin_promos").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
 def orders_admin_kb(orders: list | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     orders = orders or []
@@ -159,6 +208,18 @@ def orders_admin_kb(orders: list | None = None) -> InlineKeyboardMarkup:
         builder.adjust(1)
 
     builder.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def order_actions_kb(order_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="✅ Paid", callback_data=f"adm:order_status:{order_id}:paid")
+    builder.button(text="⚙️ Processing", callback_data=f"adm:order_status:{order_id}:processing")
+    builder.button(text="📦 Fulfilled", callback_data=f"adm:order_status:{order_id}:fulfilled")
+    builder.button(text="✔️ Completed", callback_data=f"adm:order_status:{order_id}:completed")
+    builder.button(text="❌ Canceled", callback_data=f"adm:order_status:{order_id}:canceled")
+    builder.button(text="🔙 К заказам", callback_data=NavCb(target="admin_orders").pack())
     builder.adjust(1)
     return builder.as_markup()
 
