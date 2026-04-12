@@ -14,7 +14,9 @@ class CartService:
         self.cart_item_repo = CartItemRepository(session)
         self.pricing_service = PricingService(session)
 
-    async def get_cart(self, user_id: int):
+    async def get_cart(self, user_id: int | None):
+        if not user_id:
+            return None
         return await self.cart_repo.get_with_items(user_id)
 
     async def add_item(self, user_id: int, product: Product, quantity: int = 1) -> CartItem:
@@ -75,17 +77,28 @@ class CartService:
         await self.session.flush()
         return True
 
-    async def clear_cart(self, user_id: int) -> None:
+    async def clear_cart(self, user_id: int | None) -> None:
+        if not user_id:
+            return
         await self.cart_repo.clear(user_id)
 
-    async def clear(self, user_id: int) -> None:
+    async def clear(self, user_id: int | None) -> None:
         await self.clear_cart(user_id)
 
     async def get_cart_totals(
         self,
-        user: User,
+        user: User | None,
         promo_code=None,
     ) -> dict:
+        if user is None or getattr(user, "id", None) is None:
+            return {
+                "items": [],
+                "subtotal": Decimal("0.00"),
+                "discount": Decimal("0.00"),
+                "total": Decimal("0.00"),
+                "currency_code": "RUB",
+            }
+
         cart = await self.cart_repo.get_with_items(user.id)
         if not cart or not cart.items:
             return {
