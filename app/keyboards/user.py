@@ -164,7 +164,7 @@ def cart_kb(cart_or_items=None) -> InlineKeyboardMarkup:
     if items:
         builder.adjust(*([3] * len(items)))
 
-    builder.button(text="🗑 Очистить", callback_data=CartCb(action="clear", item_id=0).pack())
+    builder.button(text="🗑 Очистить", callback_data=CartCb(action="clear").pack())
     builder.button(text="🎁 Применить промокод", callback_data=NavCb(target="promo").pack())
     builder.button(text="✅ Оформить заказ", callback_data=NavCb(target="checkout").pack())
     builder.button(text="🔙 Назад", callback_data=NavCb(target="home").pack())
