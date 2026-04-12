@@ -35,6 +35,10 @@ def admin_main_kb() -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
+def admin_menu_kb() -> InlineKeyboardMarkup:
+    return admin_main_kb()
+
+
 def admin_back_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
@@ -243,6 +247,3 @@ def admin_pagination_kb(
     builder.button(text="🔙 Назад", callback_data=NavCb(target=back_target).pack())
     builder.adjust(1)
     return builder.as_markup()
-
-def admin_menu_kb() -> InlineKeyboardMarkup:
-    return admin_main_kb()
