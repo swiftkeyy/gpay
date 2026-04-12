@@ -11,8 +11,7 @@ from redis.asyncio import Redis
 
 from app.core.config import get_settings
 from app.handlers.admin import panel
-from app.handlers.user import cart, catalog, orders, profile, reviews, start, support
-from app.handlers.user import checkout
+from app.handlers.user import cart, catalog, checkout, orders, profile, reviews, start, support
 from app.middlewares.block import BlockMiddleware
 from app.middlewares.db import DbSessionMiddleware
 from app.middlewares.user_context import UserContextMiddleware
@@ -40,7 +39,7 @@ async def main() -> None:
     dp.update.middleware(UserContextMiddleware())
     dp.update.middleware(BlockMiddleware())
 
-    # user routers
+    # user
     dp.include_router(start.router)
     dp.include_router(catalog.router)
     dp.include_router(cart.router)
@@ -50,7 +49,7 @@ async def main() -> None:
     dp.include_router(support.router)
     dp.include_router(reviews.router)
 
-    # stable admin router
+    # admin: только один стабильный роутер
     dp.include_router(panel.router)
 
     await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
