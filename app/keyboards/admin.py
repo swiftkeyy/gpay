@@ -228,27 +228,7 @@ def order_actions_kb(order_id: int) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def admin_pagination_kb(
-    prev_target: str | None = None,
-    next_target: str | None = None,
-    back_target: str = "admin_panel",
-) -> InlineKeyboardMarkup:
-    builder = InlineKeyboardBuilder()
-
-    if prev_target:
-        builder.button(text="⬅️", callback_data=NavCb(target=prev_target).pack())
-    if next_target:
-        builder.button(text="➡️", callback_data=NavCb(target=next_target).pack())
-
-    if prev_target or next_target:
-        count = int(bool(prev_target)) + int(bool(next_target))
-        builder.adjust(count)
-
-    builder.button(text="🔙 Назад", callback_data=NavCb(target=back_target).pack())
-    builder.adjust(1)
-    return builder.as_markup()
-
-    def order_admin_actions_kb(order_id: int) -> InlineKeyboardMarkup:
+def order_admin_actions_kb(order_id: int) -> InlineKeyboardMarkup:
     return order_actions_kb(order_id)
 
 
@@ -270,3 +250,24 @@ def price_admin_actions_kb(product_id: int) -> InlineKeyboardMarkup:
 
 def promo_admin_actions_kb(promo_id: int) -> InlineKeyboardMarkup:
     return promo_actions_kb(promo_id)
+
+
+def admin_pagination_kb(
+    prev_target: str | None = None,
+    next_target: str | None = None,
+    back_target: str = "admin_panel",
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    if prev_target:
+        builder.button(text="⬅️", callback_data=NavCb(target=prev_target).pack())
+    if next_target:
+        builder.button(text="➡️", callback_data=NavCb(target=next_target).pack())
+
+    if prev_target or next_target:
+        count = int(bool(prev_target)) + int(bool(next_target))
+        builder.adjust(count)
+
+    builder.button(text="🔙 Назад", callback_data=NavCb(target=back_target).pack())
+    builder.adjust(1)
+    return builder.as_markup()
