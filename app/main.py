@@ -10,7 +10,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from redis.asyncio import Redis
 
 from app.core.config import get_settings
-from app.handlers.admin import catalog as admin_catalog, panel, prices
+from app.handlers.admin import panel
 from app.handlers.user import cart, catalog, orders, profile, reviews, start, support
 from app.middlewares.block import BlockMiddleware
 from app.middlewares.db import DbSessionMiddleware
@@ -20,17 +20,26 @@ settings = get_settings()
 
 
 async def main() -> None:
-    logging.basicConfig(level=getattr(logging, settings.log_level.upper(), logging.INFO))
+    logging.basicConfig(
+        level=getattr(logging, settings.log_level.upper(), logging.INFO),
+        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    )
 
-    bot = Bot(token=settings.bot_token, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+    bot = Bot(
+        token=settings.bot_token,
+        default=DefaultBotProperties(parse_mode=ParseMode.HTML),
+    )
+
     redis = Redis.from_url(settings.redis_url)
     storage = RedisStorage(redis=redis)
+
     dp = Dispatcher(storage=storage)
 
     dp.update.middleware(DbSessionMiddleware())
     dp.update.middleware(UserContextMiddleware())
     dp.update.middleware(BlockMiddleware())
 
+    # user routers
     dp.include_router(start.router)
     dp.include_router(catalog.router)
     dp.include_router(cart.router)
@@ -39,11 +48,10 @@ async def main() -> None:
     dp.include_router(support.router)
     dp.include_router(reviews.router)
 
+    # stable admin router
     dp.include_router(panel.router)
-    dp.include_router(admin_catalog.router)
-    dp.include_router(prices.router)
 
-    await dp.start_polling(bot)
+    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
 
 if __name__ == "__main__":
