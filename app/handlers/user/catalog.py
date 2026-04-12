@@ -1,10 +1,4 @@
-@router.callback_query(F.data.startswith("buy:now:"))
-async def buy_now(
-    callback: CallbackQuery,
-    session: AsyncSession,
-    db_user: User | None = None,
-) -> None:
-    tg_user = callback.from_user
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
     if db_user is None and tg_user is not None:
         user_result = await session.execute(
