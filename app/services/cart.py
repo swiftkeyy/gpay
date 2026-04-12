@@ -1,83 +1,134 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
 from decimal import Decimal
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
-from app.models import Cart, CartItem, Product, User
+from app.models import CartItem, Product, User
 from app.repositories.cart import CartItemRepository, CartRepository
 from app.services.pricing import PricingService
 
 
-@dataclass(slots=True)
-class CartTotals:
-    subtotal: Decimal
-    discount: Decimal
-    total: Decimal
-    currency_code: str
-
-
 class CartService:
-    def __init__(self, session: AsyncSession):
+    def __init__(self, session) -> None:
         self.session = session
         self.cart_repo = CartRepository(session)
-        self.item_repo = CartItemRepository(session)
-        self.pricing = PricingService(session)
+        self.cart_item_repo = CartItemRepository(session)
+        self.pricing_service = PricingService(session)
 
-    async def get_cart(self, user_id: int) -> Cart:
-        return await self.cart_repo.get_or_create_active(user_id)
+    async def get_cart(self, user_id: int):
+        return await self.cart_repo.get_with_items(user_id)
 
-    async def add_item(self, user_id: int, product: Product, quantity: int = 1) -> Cart:
+    async def add_item(self, user_id: int, product: Product, quantity: int = 1) -> CartItem:
+        if quantity < 1:
+            quantity = 1
+
         cart = await self.cart_repo.get_or_create_active(user_id)
-        for item in cart.items:
-            if item.product_id == product.id:
-                item.quantity += quantity
-                cart.version += 1
-                await self.session.flush()
-                return cart
-        self.session.add(CartItem(cart_id=cart.id, product_id=product.id, quantity=quantity))
-        cart.version += 1
-        await self.session.flush()
-        return cart
+        item = await self.cart_item_repo.get_by_cart_and_product(cart.id, product.id)
 
-    async def change_quantity(self, user_id: int, product_id: int, delta: int) -> Cart:
-        cart = await self.cart_repo.get_or_create_active(user_id)
-        target = next((item for item in cart.items if item.product_id == product_id), None)
-        if not target:
-            return cart
-        target.quantity += delta
-        if target.quantity <= 0:
-            await self.session.delete(target)
-        cart.version += 1
-        await self.session.flush()
-        return cart
-
-    async def remove_item(self, user_id: int, product_id: int) -> Cart:
-        cart = await self.cart_repo.get_or_create_active(user_id)
-        target = next((item for item in cart.items if item.product_id == product_id), None)
-        if target:
-            await self.session.delete(target)
-            cart.version += 1
+        if item:
+            item.quantity += quantity
             await self.session.flush()
-        return cart
+            return item
 
-    async def clear(self, user_id: int) -> Cart:
-        cart = await self.cart_repo.get_or_create_active(user_id)
-        for item in list(cart.items):
-            await self.session.delete(item)
-        cart.version += 1
+        item = CartItem(
+            cart_id=cart.id,
+            product_id=product.id,
+            quantity=quantity,
+        )
+        self.session.add(item)
         await self.session.flush()
-        return cart
+        return item
 
-    async def compute_totals(self, cart: Cart, user: User, promo=None) -> CartTotals:
-        subtotal = Decimal('0.00')
-        total = Decimal('0.00')
-        currency_code = 'RUB'
+    async def change_quantity(self, item_id: int, delta: int) -> CartItem | None:
+        item = await self.cart_item_repo.get_by_id(item_id)
+        if not item:
+            return None
+
+        item.quantity += delta
+        if item.quantity <= 0:
+            await self.session.delete(item)
+            await self.session.flush()
+            return None
+
+        await self.session.flush()
+        return item
+
+    async def set_quantity(self, item_id: int, quantity: int) -> CartItem | None:
+        item = await self.cart_item_repo.get_by_id(item_id)
+        if not item:
+            return None
+
+        if quantity <= 0:
+            await self.session.delete(item)
+            await self.session.flush()
+            return None
+
+        item.quantity = quantity
+        await self.session.flush()
+        return item
+
+    async def remove_item(self, item_id: int) -> bool:
+        item = await self.cart_item_repo.get_by_id(item_id)
+        if not item:
+            return False
+
+        await self.session.delete(item)
+        await self.session.flush()
+        return True
+
+    async def clear_cart(self, user_id: int) -> None:
+        await self.cart_repo.clear(user_id)
+
+    async def get_cart_totals(
+        self,
+        user: User,
+        promo_code=None,
+    ) -> dict:
+        cart = await self.cart_repo.get_with_items(user.id)
+        if not cart or not cart.items:
+            return {
+                "items": [],
+                "subtotal": Decimal("0.00"),
+                "discount": Decimal("0.00"),
+                "total": Decimal("0.00"),
+                "currency_code": "RUB",
+            }
+
+        items_data = []
+        subtotal = Decimal("0.00")
+        total = Decimal("0.00")
+        currency_code = "RUB"
+
         for item in cart.items:
-            quote = await self.pricing.get_product_price(item.product, user=user, promo=promo)
-            subtotal += quote.base_price * item.quantity
-            total += quote.final_price * item.quantity
+            if not item.product:
+                continue
+
+            quote = await self.pricing_service.calculate_cart_item_price(
+                product=item.product,
+                quantity=item.quantity,
+                user=user,
+                promo_code=promo_code,
+            )
+
+            items_data.append(
+                {
+                    "item": item,
+                    "product": item.product,
+                    "quote": quote,
+                }
+            )
+
+            subtotal += quote.base_price
+            total += quote.final_price
             currency_code = quote.currency_code
+
         discount = subtotal - total
-        return CartTotals(subtotal=subtotal, discount=discount, total=total, currency_code=currency_code)
+        if discount < Decimal("0.00"):
+            discount = Decimal("0.00")
+
+        return {
+            "items": items_data,
+            "subtotal": subtotal,
+            "discount": discount,
+            "total": total,
+            "currency_code": currency_code,
+        }
