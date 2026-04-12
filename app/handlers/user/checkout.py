@@ -10,15 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.keyboards.payment import payment_methods_kb
-from app.models import (
-    Cart,
-    CartItem,
-    Order,
-    OrderItem,
-    OrderStatus,
-    PaymentProviderType,
-    User,
-)
+from app.models import Order, OrderItem, OrderStatus, PaymentProviderType, User
 from app.services.cart import CartService
 from app.utils.callbacks import NavCb, PaymentCb
 
@@ -29,12 +21,57 @@ def _order_number() -> str:
     return f"GP-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
 
 
+async def _resolve_db_user(
+    session: AsyncSession,
+    db_user: User | None,
+    tg_user,
+) -> User | None:
+    if db_user is not None and getattr(db_user, "id", None) is not None:
+        return db_user
+
+    if tg_user is None:
+        return None
+
+    result = await session.execute(
+        select(User).where(User.telegram_id == tg_user.id)
+    )
+    user = result.scalar_one_or_none()
+
+    if user is not None:
+        user.username = tg_user.username
+        user.first_name = tg_user.first_name
+        user.last_name = tg_user.last_name
+        await session.flush()
+        return user
+
+    user = User(
+        telegram_id=tg_user.id,
+        username=tg_user.username,
+        first_name=tg_user.first_name,
+        last_name=tg_user.last_name,
+        is_blocked=False,
+        block_reason=None,
+        personal_discount_percent=0,
+        referral_code=f"REF{tg_user.id}",
+    )
+    session.add(user)
+    await session.flush()
+    await session.commit()
+
+    result = await session.execute(
+        select(User).where(User.telegram_id == tg_user.id)
+    )
+    return result.scalar_one_or_none()
+
+
 @router.callback_query(NavCb.filter(F.target == "checkout"))
 async def checkout_from_cart(
     callback: CallbackQuery,
     session: AsyncSession,
     db_user: User | None = None,
 ) -> None:
+    db_user = await _resolve_db_user(session, db_user, callback.from_user)
+
     if db_user is None or getattr(db_user, "id", None) is None:
         await callback.answer("Пользователь не найден", show_alert=True)
         return
@@ -75,7 +112,7 @@ async def checkout_from_cart(
             if row["item"].id == item.id:
                 quote = row["quote"]
                 if item.quantity > 0:
-                    unit_price = quote.final_price / item.quantity
+                    unit_price = (quote.final_price / item.quantity).quantize(Decimal("0.01"))
                 line_total = quote.final_price
                 break
 
@@ -97,6 +134,7 @@ async def checkout_from_cart(
     for item in list(cart.items):
         await session.delete(item)
 
+    order.status = OrderStatus.WAITING_PAYMENT
     await session.commit()
 
     text = (
@@ -134,7 +172,7 @@ async def choose_manual_payment(
         f"💬 <b>Ручная оплата</b>\n\n"
         f"Заказ: <code>{order.order_number}</code>\n"
         f"Сумма: <b>{order.total_amount} {order.currency_code}</b>\n\n"
-        f"Отправьте оплату по инструкции магазина и дождитесь подтверждения администратора."
+        f"Свяжитесь с поддержкой или оплатите по инструкции магазина."
     )
 
     if callback.message:
@@ -160,7 +198,7 @@ async def choose_stars_payment(
         f"⭐ <b>Telegram Stars</b>\n\n"
         f"Заказ: <code>{order.order_number}</code>\n"
         f"Сумма: <b>{order.total_amount}</b>\n\n"
-        f"Интеграция Stars подключается следующим шагом через sendInvoice."
+        f"Следующим шагом сюда подключается sendInvoice."
     )
 
     if callback.message:
@@ -186,7 +224,7 @@ async def choose_cryptobot_payment(
         f"💎 <b>Crypto Bot</b>\n\n"
         f"Заказ: <code>{order.order_number}</code>\n"
         f"Сумма: <b>{order.total_amount} {order.currency_code}</b>\n\n"
-        f"Интеграция Crypto Bot подключается следующим шагом через createInvoice."
+        f"Следующим шагом сюда подключается createInvoice."
     )
 
     if callback.message:
