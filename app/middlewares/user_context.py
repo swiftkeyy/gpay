@@ -7,7 +7,10 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
 
-from app.models import Admin, User
+from app.core.config import get_settings
+from app.models import Admin, AdminRole, User
+
+settings = get_settings()
 
 
 class UserContextMiddleware(BaseMiddleware):
@@ -64,6 +67,22 @@ class UserContextMiddleware(BaseMiddleware):
                 Admin.is_active.is_(True),
             )
         )
-        data["admin"] = admin_result.scalar_one_or_none()
+        admin = admin_result.scalar_one_or_none()
 
+        # fallback по env, даже если таблица admins ещё не заполнена
+        if admin is None:
+            if tg_user.id == settings.super_admin_tg_id:
+                admin = Admin(
+                    user_id=db_user.id,
+                    role=AdminRole.SUPER_ADMIN,
+                    is_active=True,
+                )
+            elif tg_user.id == settings.second_admin_tg_id:
+                admin = Admin(
+                    user_id=db_user.id,
+                    role=AdminRole.ADMIN,
+                    is_active=True,
+                )
+
+        data["admin"] = admin
         return await handler(event, data)
