@@ -5,7 +5,6 @@ from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Price, Product, PromoCode, PromoType, User
 
@@ -23,12 +22,11 @@ class PriceCalculationResult:
 
 
 class PricingService:
-    async def get_active_price(
-        self,
-        session: AsyncSession,
-        product_id: int,
-    ) -> Price | None:
-        result = await session.execute(
+    def __init__(self, session) -> None:
+        self.session = session
+
+    async def get_active_price(self, product_id: int) -> Price | None:
+        result = await self.session.execute(
             select(Price)
             .where(
                 Price.product_id == product_id,
@@ -40,7 +38,6 @@ class PricingService:
 
     async def calculate_product_price(
         self,
-        session: AsyncSession,
         *,
         product: Product,
         user: User | None = None,
@@ -50,7 +47,7 @@ class PricingService:
         if quantity < 1:
             quantity = 1
 
-        active_price = await self.get_active_price(session, product.id)
+        active_price = await self.get_active_price(product.id)
         if active_price is None:
             raise ValueError("Active price for product not found")
 
@@ -112,7 +109,6 @@ class PricingService:
 
     async def calculate_cart_item_price(
         self,
-        session: AsyncSession,
         *,
         product: Product,
         quantity: int,
@@ -120,7 +116,20 @@ class PricingService:
         promo_code: PromoCode | None = None,
     ) -> PriceCalculationResult:
         return await self.calculate_product_price(
-            session,
+            product=product,
+            user=user,
+            promo_code=promo_code,
+            quantity=quantity,
+        )
+
+    async def get_product_price(
+        self,
+        product: Product,
+        user: User | None = None,
+        promo_code: PromoCode | None = None,
+        quantity: int = 1,
+    ) -> PriceCalculationResult:
+        return await self.calculate_product_price(
             product=product,
             user=user,
             promo_code=promo_code,
