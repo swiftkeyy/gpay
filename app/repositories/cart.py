@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import selectinload
 
 from app.models import Cart, CartItem
 from app.repositories.base import BaseRepository
@@ -11,29 +11,55 @@ class CartRepository(BaseRepository[Cart]):
     model = Cart
 
     async def get_or_create_active(self, user_id: int) -> Cart:
-        stmt = (
-            select(Cart)
-            .where(Cart.user_id == user_id, Cart.is_active.is_(True))
-            .options(joinedload(Cart.items).joinedload(CartItem.product))
-            .with_for_update()
+        result = await self.session.execute(
+            select(Cart).where(Cart.user_id == user_id)
         )
-        cart = await self.session.scalar(stmt)
+        cart = result.scalar_one_or_none()
         if cart:
             return cart
+
         cart = Cart(user_id=user_id)
         self.session.add(cart)
         await self.session.flush()
         return cart
 
-    async def get_full_active(self, user_id: int) -> Cart | None:
-        stmt = (
+    async def get_with_items(self, user_id: int) -> Cart | None:
+        result = await self.session.execute(
             select(Cart)
-            .where(Cart.user_id == user_id, Cart.is_active.is_(True))
-            .options(joinedload(Cart.items).joinedload(CartItem.product))
+            .options(
+                selectinload(Cart.items).selectinload(CartItem.product),
+            )
+            .where(Cart.user_id == user_id)
         )
-        result = await self.session.execute(stmt)
-        return result.unique().scalar_one_or_none()
+        return result.scalar_one_or_none()
+
+    async def clear(self, user_id: int) -> None:
+        cart = await self.get_with_items(user_id)
+        if not cart:
+            return
+
+        for item in list(cart.items):
+            await self.session.delete(item)
+
+        await self.session.flush()
 
 
 class CartItemRepository(BaseRepository[CartItem]):
     model = CartItem
+
+    async def get_by_cart_and_product(self, cart_id: int, product_id: int) -> CartItem | None:
+        result = await self.session.execute(
+            select(CartItem).where(
+                CartItem.cart_id == cart_id,
+                CartItem.product_id == product_id,
+            )
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_id(self, item_id: int) -> CartItem | None:
+        result = await self.session.execute(
+            select(CartItem)
+            .options(selectinload(CartItem.product))
+            .where(CartItem.id == item_id)
+        )
+        return result.scalar_one_or_none()
