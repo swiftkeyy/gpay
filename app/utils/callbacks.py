@@ -5,8 +5,8 @@ from aiogram.filters.callback_data import CallbackData
 
 class NavCb(CallbackData, prefix="nav"):
     target: str
-    entity_id: int | None = None
     page: int | None = None
+    entity_id: int | None = None
     extra: str | None = None
 
 
