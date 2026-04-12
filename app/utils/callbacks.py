@@ -10,6 +10,12 @@ class NavCb(CallbackData, prefix="nav"):
     extra: str | None = None
 
 
+class ConfirmCb(CallbackData, prefix="cfm"):
+    action: str
+    value: str | None = None
+    entity_id: int | None = None
+
+
 class CartCb(CallbackData, prefix="cart"):
     action: str
     item_id: int | None = None
