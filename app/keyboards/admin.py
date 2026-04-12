@@ -243,3 +243,6 @@ def admin_pagination_kb(
     builder.button(text="🔙 Назад", callback_data=NavCb(target=back_target).pack())
     builder.adjust(1)
     return builder.as_markup()
+
+def admin_menu_kb() -> InlineKeyboardMarkup:
+    return admin_main_kb()
