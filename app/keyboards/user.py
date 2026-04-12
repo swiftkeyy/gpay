@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 from aiogram.types import InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.utils.callbacks import CartCb, NavCb
+
+
+def _safe_id(obj) -> int:
+    return int(getattr(obj, "id", 0) or 0)
 
 
 def main_menu_kb() -> InlineKeyboardMarkup:
@@ -23,6 +25,88 @@ def main_menu_kb() -> InlineKeyboardMarkup:
     builder.button(text="ℹ️ Информация / Правила", callback_data=NavCb(target="info").pack())
 
     builder.adjust(2, 2, 2, 2, 1, 1)
+    return builder.as_markup()
+
+
+def games_kb(games: list | None = None) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    games = games or []
+
+    for game in games:
+        game_id = _safe_id(game)
+        title = getattr(game, "title", f"Игра #{game_id}")
+        builder.button(text=title, callback_data=f"game:{game_id}")
+
+    if games:
+        builder.adjust(1)
+
+    builder.button(text="🔙 В меню", callback_data=NavCb(target="home").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def categories_kb(game_id: int, categories: list | None = None) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    categories = categories or []
+
+    for category in categories:
+        category_id = _safe_id(category)
+        title = getattr(category, "title", f"Категория #{category_id}")
+        builder.button(text=title, callback_data=f"cat:{game_id}:{category_id}")
+
+    if categories:
+        builder.adjust(1)
+
+    builder.button(text="🔙 К играм", callback_data=NavCb(target="games").pack())
+    builder.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
+    builder.adjust(1, 1)
+    return builder.as_markup()
+
+
+def products_kb(
+    game_id: int,
+    category_id: int,
+    products: list | None = None,
+    page: int = 1,
+    has_prev: bool = False,
+    has_next: bool = False,
+) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    products = products or []
+
+    for product in products:
+        product_id = _safe_id(product)
+        title = getattr(product, "title", f"Товар #{product_id}")
+        builder.button(text=title, callback_data=f"prod:{product_id}")
+
+    if products:
+        builder.adjust(1)
+
+    nav_row = []
+    if has_prev:
+        builder.button(text="⬅️", callback_data=f"prodpage:{game_id}:{category_id}:{page - 1}")
+        nav_row.append(1)
+    if has_next:
+        builder.button(text="➡️", callback_data=f"prodpage:{game_id}:{category_id}:{page + 1}")
+        nav_row.append(1)
+    if nav_row:
+        builder.adjust(*nav_row)
+
+    builder.button(text="🔙 К категориям", callback_data=f"game:{game_id}")
+    builder.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
+    builder.adjust(1, 1)
+    return builder.as_markup()
+
+
+def product_kb(product_id: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+
+    builder.button(text="➕ Добавить в корзину", callback_data=f"buy:add:{product_id}")
+    builder.button(text="⚡ Купить сразу", callback_data=f"buy:now:{product_id}")
+    builder.button(text="🛒 Корзина", callback_data=NavCb(target="cart").pack())
+    builder.button(text="🔙 Назад", callback_data=NavCb(target="games").pack())
+
+    builder.adjust(1, 1, 2)
     return builder.as_markup()
 
 
@@ -64,7 +148,7 @@ def cart_kb(cart_or_items=None) -> InlineKeyboardMarkup:
     builder.button(text="✅ Оформить заказ", callback_data=NavCb(target="checkout").pack())
     builder.button(text="🔙 Назад", callback_data=NavCb(target="home").pack())
 
-    builder.adjust(3, 1, 1, 1, 1)
+    builder.adjust(1, 1, 1, 1)
     return builder.as_markup()
 
 
