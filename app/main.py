@@ -12,6 +12,7 @@ from redis.asyncio import Redis
 from app.core.config import get_settings
 from app.handlers.admin import panel
 from app.handlers.user import cart, catalog, orders, profile, reviews, start, support
+from app.handlers.user import checkout
 from app.middlewares.block import BlockMiddleware
 from app.middlewares.db import DbSessionMiddleware
 from app.middlewares.user_context import UserContextMiddleware
@@ -43,6 +44,7 @@ async def main() -> None:
     dp.include_router(start.router)
     dp.include_router(catalog.router)
     dp.include_router(cart.router)
+    dp.include_router(checkout.router)
     dp.include_router(orders.router)
     dp.include_router(profile.router)
     dp.include_router(support.router)
