@@ -247,3 +247,26 @@ def admin_pagination_kb(
     builder.button(text="🔙 Назад", callback_data=NavCb(target=back_target).pack())
     builder.adjust(1)
     return builder.as_markup()
+
+    def order_admin_actions_kb(order_id: int) -> InlineKeyboardMarkup:
+    return order_actions_kb(order_id)
+
+
+def game_admin_actions_kb(game_id: int) -> InlineKeyboardMarkup:
+    return game_actions_kb(game_id)
+
+
+def category_admin_actions_kb(category_id: int) -> InlineKeyboardMarkup:
+    return category_actions_kb(category_id)
+
+
+def product_admin_actions_kb(product_id: int) -> InlineKeyboardMarkup:
+    return product_actions_kb(product_id)
+
+
+def price_admin_actions_kb(product_id: int) -> InlineKeyboardMarkup:
+    return price_actions_kb(product_id)
+
+
+def promo_admin_actions_kb(promo_id: int) -> InlineKeyboardMarkup:
+    return promo_actions_kb(promo_id)
