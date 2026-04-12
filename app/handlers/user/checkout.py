@@ -1,102 +1,194 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+from decimal import Decimal
+from uuid import uuid4
+
 from aiogram import F, Router
-from aiogram.fsm.context import FSMContext
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import CallbackQuery
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Product, User
+from app.keyboards.payment import payment_methods_kb
+from app.models import (
+    Cart,
+    CartItem,
+    Order,
+    OrderItem,
+    OrderStatus,
+    PaymentProviderType,
+    User,
+)
 from app.services.cart import CartService
-from app.services.orders import OrderService
-from app.services.payment import ManualPaymentProvider
-from app.states.user import CheckoutStates
-from app.utils.callbacks import NavCb
-from app.utils.idempotency import build_checkout_key
-from app.utils.validators import ValidationError, validate_dynamic_field
+from app.utils.callbacks import NavCb, PaymentCb
 
-router = Router(name='user_checkout')
+router = Router(name="user_checkout")
 
 
-def _build_dynamic_fields(products: list[Product]) -> list[dict]:
-    fields: list[dict] = []
-    for product in products:
-        prefix = product.slug
-        if product.requires_player_id:
-            fields.append({'key': f'{prefix}.player_id', 'label': f'{product.title}: player_id', 'type': 'text', 'required': True})
-        if product.requires_nickname:
-            fields.append({'key': f'{prefix}.nickname', 'label': f'{product.title}: nickname', 'type': 'text', 'required': True})
-        if product.requires_region:
-            fields.append({'key': f'{prefix}.region', 'label': f'{product.title}: region', 'type': 'text', 'required': True})
-        if product.requires_screenshot:
-            fields.append({'key': f'{prefix}.screenshot_note', 'label': f'{product.title}: ссылка/комментарий к скриншоту', 'type': 'text', 'required': True})
-        for item in product.extra_fields_schema_json:
-            schema = dict(item)
-            schema['key'] = f'{prefix}.{schema["key"]}'
-            schema['label'] = f'{product.title}: {schema.get("label", schema["key"])}'
-            fields.append(schema)
-    return fields
+def _order_number() -> str:
+    return f"GP-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
 
 
-async def start_checkout(callback: CallbackQuery, session: AsyncSession, db_user: User, state: FSMContext) -> None:
-    cart = await CartService(session).get_cart(db_user.id)
-    if not cart.items:
-        await callback.answer('Корзина пуста.', show_alert=True)
+@router.callback_query(NavCb.filter(F.target == "checkout"))
+async def checkout_from_cart(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    db_user: User | None = None,
+) -> None:
+    if db_user is None or getattr(db_user, "id", None) is None:
+        await callback.answer("Пользователь не найден", show_alert=True)
         return
-    fields = _build_dynamic_fields([item.product for item in cart.items])
-    await state.set_state(CheckoutStates.collecting_fields)
-    await state.update_data(checkout_fields=fields, answers={}, step=0)
-    if fields:
-        await callback.message.answer(f'Оформление заказа.\n\nВведите: {fields[0]["label"]}')
-    else:
-        await finalize_checkout(callback.message, session, db_user, state)
+
+    cart_service = CartService(session)
+    totals = await cart_service.get_cart_totals(db_user)
+    cart = await cart_service.get_cart(db_user.id)
+
+    if cart is None or not getattr(cart, "items", None):
+        await callback.answer("Корзина пуста", show_alert=True)
+        return
+
+    order = Order(
+        order_number=_order_number(),
+        user_id=db_user.id,
+        status=OrderStatus.NEW,
+        subtotal_amount=totals["subtotal"],
+        discount_amount=totals["discount"],
+        total_amount=totals["total"],
+        currency_code=totals["currency_code"],
+        payment_provider=PaymentProviderType.MANUAL,
+        payment_external_id=None,
+        fulfillment_type=cart.items[0].product.fulfillment_type if cart.items and cart.items[0].product else "manual",
+        customer_data_json={},
+        admin_comment=None,
+    )
+    session.add(order)
+    await session.flush()
+
+    for item in cart.items:
+        if not item.product:
+            continue
+
+        unit_price = Decimal("0.00")
+        line_total = Decimal("0.00")
+
+        for row in totals["items"]:
+            if row["item"].id == item.id:
+                quote = row["quote"]
+                if item.quantity > 0:
+                    unit_price = quote.final_price / item.quantity
+                line_total = quote.final_price
+                break
+
+        session.add(
+            OrderItem(
+                order_id=order.id,
+                product_id=item.product.id,
+                title_snapshot=item.product.title,
+                quantity=item.quantity,
+                unit_price=unit_price,
+                total_price=line_total,
+                fulfillment_type=item.product.fulfillment_type,
+                metadata_json={},
+            )
+        )
+
+    await session.flush()
+
+    for item in list(cart.items):
+        await session.delete(item)
+
+    await session.commit()
+
+    text = (
+        f"🧾 <b>Заказ создан</b>\n\n"
+        f"Номер: <code>{order.order_number}</code>\n"
+        f"Сумма: <b>{order.total_amount} {order.currency_code}</b>\n\n"
+        f"Выберите способ оплаты:"
+    )
+
+    if callback.message:
+        await callback.message.edit_text(
+            text,
+            reply_markup=payment_methods_kb(order.id),
+            parse_mode="HTML",
+        )
     await callback.answer()
 
 
-@router.callback_query(NavCb.filter(F.target == 'checkout'))
-async def checkout_entry(callback: CallbackQuery, session: AsyncSession, db_user: User, state: FSMContext) -> None:
-    await start_checkout(callback, session, db_user, state)
-
-
-@router.message(CheckoutStates.collecting_fields)
-async def collect_checkout_fields(message: Message, session: AsyncSession, db_user: User, state: FSMContext) -> None:
-    data = await state.get_data()
-    fields: list[dict] = data.get('checkout_fields', [])
-    step: int = data.get('step', 0)
-    answers: dict = data.get('answers', {})
-    if step >= len(fields):
-        await finalize_checkout(message, session, db_user, state)
+@router.callback_query(PaymentCb.filter(F.action == "manual"))
+async def choose_manual_payment(
+    callback: CallbackQuery,
+    callback_data: PaymentCb,
+    session: AsyncSession,
+) -> None:
+    order = await session.get(Order, callback_data.order_id)
+    if order is None:
+        await callback.answer("Заказ не найден", show_alert=True)
         return
-    field = fields[step]
-    try:
-        answers[field['key']] = validate_dynamic_field(field, message.text or '')
-    except ValidationError as exc:
-        await message.answer(str(exc))
-        return
-    step += 1
-    await state.update_data(answers=answers, step=step)
-    if step < len(fields):
-        await message.answer(f'Введите: {fields[step]["label"]}')
-    else:
-        await finalize_checkout(message, session, db_user, state)
 
+    order.status = OrderStatus.WAITING_PAYMENT
+    order.payment_provider = PaymentProviderType.MANUAL
+    await session.commit()
 
-async def finalize_checkout(message: Message, session: AsyncSession, db_user: User, state: FSMContext) -> None:
-    cart_service = CartService(session)
-    cart = await cart_service.get_cart(db_user.id)
-    if not cart.items:
-        await state.clear()
-        await message.answer('Корзина пуста.')
-        return
-    data = await state.get_data()
-    answers = data.get('answers', {})
-    checkout_key = build_checkout_key(db_user.id, cart.id, cart.version)
-    order = await OrderService(session).create_order_from_cart(
-        cart=cart,
-        user=db_user,
-        metadata={'answers': answers},
-        checkout_key=checkout_key,
-        actor_user_id=db_user.id,
+    text = (
+        f"💬 <b>Ручная оплата</b>\n\n"
+        f"Заказ: <code>{order.order_number}</code>\n"
+        f"Сумма: <b>{order.total_amount} {order.currency_code}</b>\n\n"
+        f"Отправьте оплату по инструкции магазина и дождитесь подтверждения администратора."
     )
-    instruction = await ManualPaymentProvider().build_instruction(order)
-    await state.clear()
-    await message.answer(instruction.text)
+
+    if callback.message:
+        await callback.message.edit_text(text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(PaymentCb.filter(F.action == "stars"))
+async def choose_stars_payment(
+    callback: CallbackQuery,
+    callback_data: PaymentCb,
+    session: AsyncSession,
+) -> None:
+    order = await session.get(Order, callback_data.order_id)
+    if order is None:
+        await callback.answer("Заказ не найден", show_alert=True)
+        return
+
+    order.status = OrderStatus.WAITING_PAYMENT
+    await session.commit()
+
+    text = (
+        f"⭐ <b>Telegram Stars</b>\n\n"
+        f"Заказ: <code>{order.order_number}</code>\n"
+        f"Сумма: <b>{order.total_amount}</b>\n\n"
+        f"Интеграция Stars подключается следующим шагом через sendInvoice."
+    )
+
+    if callback.message:
+        await callback.message.edit_text(text, parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(PaymentCb.filter(F.action == "cryptobot"))
+async def choose_cryptobot_payment(
+    callback: CallbackQuery,
+    callback_data: PaymentCb,
+    session: AsyncSession,
+) -> None:
+    order = await session.get(Order, callback_data.order_id)
+    if order is None:
+        await callback.answer("Заказ не найден", show_alert=True)
+        return
+
+    order.status = OrderStatus.WAITING_PAYMENT
+    await session.commit()
+
+    text = (
+        f"💎 <b>Crypto Bot</b>\n\n"
+        f"Заказ: <code>{order.order_number}</code>\n"
+        f"Сумма: <b>{order.total_amount} {order.currency_code}</b>\n\n"
+        f"Интеграция Crypto Bot подключается следующим шагом через createInvoice."
+    )
+
+    if callback.message:
+        await callback.message.edit_text(text, parse_mode="HTML")
+    await callback.answer()
