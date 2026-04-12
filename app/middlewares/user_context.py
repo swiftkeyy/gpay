@@ -7,10 +7,7 @@ from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
 
-from app.core.config import get_settings
-from app.models import Admin, AdminRole, User
-
-settings = get_settings()
+from app.models import Admin, User
 
 
 class UserContextMiddleware(BaseMiddleware):
@@ -53,6 +50,12 @@ class UserContextMiddleware(BaseMiddleware):
             )
             session.add(db_user)
             await session.flush()
+            await session.commit()
+
+            result = await session.execute(
+                select(User).where(User.telegram_id == tg_user.id)
+            )
+            db_user = result.scalar_one_or_none()
         else:
             db_user.username = tg_user.username
             db_user.first_name = tg_user.first_name
@@ -61,28 +64,15 @@ class UserContextMiddleware(BaseMiddleware):
 
         data["db_user"] = db_user
 
-        admin_result = await session.execute(
-            select(Admin).where(
-                Admin.user_id == db_user.id,
-                Admin.is_active.is_(True),
+        if db_user is not None:
+            admin_result = await session.execute(
+                select(Admin).where(
+                    Admin.user_id == db_user.id,
+                    Admin.is_active.is_(True),
+                )
             )
-        )
-        admin = admin_result.scalar_one_or_none()
+            data["admin"] = admin_result.scalar_one_or_none()
+        else:
+            data["admin"] = None
 
-        # fallback по env, даже если таблица admins ещё не заполнена
-        if admin is None:
-            if tg_user.id == settings.super_admin_tg_id:
-                admin = Admin(
-                    user_id=db_user.id,
-                    role=AdminRole.SUPER_ADMIN,
-                    is_active=True,
-                )
-            elif tg_user.id == settings.second_admin_tg_id:
-                admin = Admin(
-                    user_id=db_user.id,
-                    role=AdminRole.ADMIN,
-                    is_active=True,
-                )
-
-        data["admin"] = admin
         return await handler(event, data)
