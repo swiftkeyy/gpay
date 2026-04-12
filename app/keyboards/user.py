@@ -82,15 +82,13 @@ def products_kb(
     if products:
         builder.adjust(1)
 
-    nav_row = []
     if has_prev:
         builder.button(text="⬅️", callback_data=f"prodpage:{game_id}:{category_id}:{page - 1}")
-        nav_row.append(1)
     if has_next:
         builder.button(text="➡️", callback_data=f"prodpage:{game_id}:{category_id}:{page + 1}")
-        nav_row.append(1)
-    if nav_row:
-        builder.adjust(*nav_row)
+
+    if has_prev or has_next:
+        builder.adjust(int(has_prev) + int(has_next))
 
     builder.button(text="🔙 К категориям", callback_data=f"game:{game_id}")
     builder.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
@@ -113,17 +111,14 @@ def product_kb(product_id: int) -> InlineKeyboardMarkup:
 def _extract_cart_items(cart_or_items) -> list:
     if cart_or_items is None:
         return []
-
     if isinstance(cart_or_items, list):
         return cart_or_items
 
     items = getattr(cart_or_items, "items", None)
     if items is None:
         return []
-
     if isinstance(items, list):
         return items
-
     return list(items)
 
 
