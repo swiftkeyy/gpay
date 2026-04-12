@@ -21,13 +21,16 @@ def _format_money(value: Decimal | int | float | str) -> str:
 async def render_cart(
     target: CallbackQuery,
     session: AsyncSession,
-    db_user: User,
+    db_user: User | None,
 ) -> None:
     cart_service = CartService(session)
     totals = await cart_service.get_cart_totals(db_user)
-    cart = await cart_service.get_cart(db_user.id)
 
-    if cart is None or not cart.items:
+    cart = None
+    if db_user is not None and getattr(db_user, "id", None) is not None:
+        cart = await cart_service.get_cart(db_user.id)
+
+    if cart is None or not getattr(cart, "items", None):
         text = (
             "🛒 <b>Корзина</b>\n\n"
             "Ваша корзина пока пуста."
@@ -63,7 +66,7 @@ async def render_cart(
     if target.message:
         await target.message.edit_text(
             text,
-            reply_markup=cart_kb(cart.items),
+            reply_markup=cart_kb(cart),
             parse_mode="HTML",
         )
     await target.answer()
@@ -73,7 +76,7 @@ async def render_cart(
 async def open_cart(
     callback: CallbackQuery,
     session: AsyncSession,
-    db_user: User,
+    db_user: User | None,
 ) -> None:
     await render_cart(callback, session, db_user)
 
@@ -83,8 +86,12 @@ async def cart_actions(
     callback: CallbackQuery,
     callback_data: CartCb,
     session: AsyncSession,
-    db_user: User,
+    db_user: User | None,
 ) -> None:
+    if db_user is None or getattr(db_user, "id", None) is None:
+        await callback.answer("Пользователь не найден", show_alert=True)
+        return
+
     cart_service = CartService(session)
 
     if callback_data.action == "clear":
