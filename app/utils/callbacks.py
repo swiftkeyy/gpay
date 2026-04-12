@@ -7,9 +7,29 @@ class NavCb(CallbackData, prefix="nav"):
     target: str
     entity_id: int | None = None
     page: int | None = None
+    extra: str | None = None
+
+
+class ConfirmCb(CallbackData, prefix="cfm"):
+    action: str
+    value: str | None = None
+    entity_id: int | None = None
+
+
+class CartCb(CallbackData, prefix="cart"):
+    action: str
+    item_id: int | None = None
+    product_id: int | None = None
 
 
 class AdminCb(CallbackData, prefix="adm"):
+    section: str
+    action: str
+    entity_id: int | None = None
+    page: int | None = None
+
+
+class AdminActionCb(CallbackData, prefix="adm"):
     section: str
     action: str
     entity_id: int | None = None
