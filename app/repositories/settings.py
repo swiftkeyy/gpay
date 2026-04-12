@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuditLog, BotSetting, Broadcast, Referral, ReferralReward, Review
 from app.repositories.base import BaseRepository
@@ -10,28 +9,27 @@ from app.repositories.base import BaseRepository
 class BotSettingRepository(BaseRepository[BotSetting]):
     model = BotSetting
 
-    async def get_by_key(self, session: AsyncSession, key: str) -> BotSetting | None:
-        result = await session.execute(
+    async def get_by_key(self, key: str) -> BotSetting | None:
+        result = await self.session.execute(
             select(BotSetting).where(BotSetting.key == key)
         )
         return result.scalar_one_or_none()
 
     async def set_value(
         self,
-        session: AsyncSession,
         *,
         key: str,
         value: str,
         description: str | None = None,
         is_public: bool = False,
     ) -> BotSetting:
-        setting = await self.get_by_key(session, key)
+        setting = await self.get_by_key(key)
         if setting:
             setting.value = value
             if description is not None:
                 setting.description = description
             setting.is_public = is_public
-            await session.flush()
+            await self.session.flush()
             return setting
 
         setting = BotSetting(
@@ -40,8 +38,8 @@ class BotSettingRepository(BaseRepository[BotSetting]):
             description=description,
             is_public=is_public,
         )
-        session.add(setting)
-        await session.flush()
+        self.session.add(setting)
+        await self.session.flush()
         return setting
 
 
@@ -52,8 +50,8 @@ class SettingsRepository(BotSettingRepository):
 class BroadcastRepository(BaseRepository[Broadcast]):
     model = Broadcast
 
-    async def get_by_id(self, session: AsyncSession, broadcast_id: int) -> Broadcast | None:
-        result = await session.execute(
+    async def get_by_id(self, broadcast_id: int) -> Broadcast | None:
+        result = await self.session.execute(
             select(Broadcast).where(Broadcast.id == broadcast_id)
         )
         return result.scalar_one_or_none()
