@@ -4,27 +4,43 @@ from collections.abc import Awaitable, Callable
 from typing import Any
 
 from aiogram import BaseMiddleware
+from aiogram.types import TelegramObject
+from sqlalchemy import select
 
-from app.repositories.users import UserRepository
+from app.models import Admin, User
 
 
 class UserContextMiddleware(BaseMiddleware):
-    async def __call__(self, handler: Callable[[Any, dict[str, Any]], Awaitable[Any]], event: Any, data: dict[str, Any]) -> Any:
-        session = data['session']
-        event_from_user = data.get('event_from_user')
-        if event_from_user:
-            repo = UserRepository(session)
-            user = await repo.get_by_telegram_id(event_from_user.id)
-            if user is None:
-                user = await repo.create(
-                    telegram_id=event_from_user.id,
-                    username=event_from_user.username,
-                    first_name=event_from_user.first_name,
-                    last_name=event_from_user.last_name,
+    async def __call__(
+        self,
+        handler: Callable[[TelegramObject, dict[str, Any]], Awaitable[Any]],
+        event: TelegramObject,
+        data: dict[str, Any],
+    ) -> Any:
+        session = data.get("session")
+        tg_user = getattr(event, "from_user", None)
+
+        if session is None or tg_user is None:
+            return await handler(event, data)
+
+        result = await session.execute(
+            select(User).where(User.telegram_id == tg_user.id)
+        )
+        db_user = result.scalar_one_or_none()
+
+        if db_user is not None:
+            data["db_user"] = db_user
+
+            admin_result = await session.execute(
+                select(Admin).where(
+                    Admin.user_id == db_user.id,
+                    Admin.is_active.is_(True),
                 )
-            else:
-                user.username = event_from_user.username
-                user.first_name = event_from_user.first_name
-                user.last_name = event_from_user.last_name
-            data['db_user'] = user
+            )
+            admin = admin_result.scalar_one_or_none()
+            data["admin"] = admin
+        else:
+            data["db_user"] = None
+            data["admin"] = None
+
         return await handler(event, data)
