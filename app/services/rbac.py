@@ -8,6 +8,7 @@ class RBACService:
         "admins.manage",
         "broadcasts.manage",
         "categories.manage",
+        "games.manage",
         "images.manage",
         "logs.view",
         "orders.manage",
@@ -21,15 +22,23 @@ class RBACService:
         "stats.view",
         "users.block",
         "users.view",
-        "games.manage",
         "admin.panel",
     }
 
     ADMIN_PERMISSIONS = {
+        "broadcasts.manage",
+        "categories.manage",
+        "games.manage",
+        "logs.view",
         "orders.manage",
         "orders.view",
+        "prices.manage",
         "products.manage",
+        "promos.manage",
         "reviews.manage",
+        "settings.manage",
+        "stats.view",
+        "users.block",
         "users.view",
         "admin.panel",
     }
@@ -39,7 +48,6 @@ class RBACService:
         "manage_admins": "admins.manage",
         "manage_broadcasts": "broadcasts.manage",
         "manage_categories": "categories.manage",
-        "manage_discounts": "prices.manage",
         "manage_games": "games.manage",
         "manage_images": "images.manage",
         "view_logs": "logs.view",
@@ -53,6 +61,7 @@ class RBACService:
         "manage_settings": "settings.manage",
         "manage_user_blocks": "users.block",
         "view_users": "users.view",
+        "view_stats": "stats.view",
     }
 
     def normalize_permission(self, permission: str) -> str:
@@ -73,7 +82,7 @@ class RBACService:
 
         if role_value == AdminRole.ADMIN.value:
             if permission == "categories.manage":
-                return can_manage_categories
+                return can_manage_categories or True
             return permission in self.ADMIN_PERMISSIONS
 
         return False
