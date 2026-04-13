@@ -34,33 +34,9 @@ async def _resolve_db_user(
     user = result.scalar_one_or_none()
 
     if user is not None:
-        changed = False
-        if user.username != tg_user.username:
-            user.username = tg_user.username
-            changed = True
-        if user.first_name != tg_user.first_name:
-            user.first_name = tg_user.first_name
-            changed = True
-        if user.last_name != tg_user.last_name:
-            user.last_name = tg_user.last_name
-            changed = True
-        if changed:
-            await session.flush()
         return user
 
-    user = User(
-        telegram_id=tg_user.id,
-        username=tg_user.username,
-        first_name=tg_user.first_name,
-        last_name=tg_user.last_name,
-        is_blocked=False,
-        block_reason=None,
-        personal_discount_percent=0,
-        referral_code=f"REF{tg_user.id}",
-    )
-    session.add(user)
-    await session.flush()
-    return user
+    return None
 
 
 async def render_cart(
@@ -68,6 +44,8 @@ async def render_cart(
     session: AsyncSession,
     db_user: User | None,
 ) -> None:
+    db_user = await _resolve_db_user(session, db_user, target.from_user)
+
     if db_user is None or getattr(db_user, "id", None) is None:
         if target.message:
             await target.message.edit_text(
@@ -79,8 +57,8 @@ async def render_cart(
         return
 
     cart_service = CartService(session)
-    totals = await cart_service.get_cart_totals(db_user)
     cart = await cart_service.get_cart(db_user.id)
+    totals = await cart_service.get_cart_totals(db_user)
 
     if cart is None or not getattr(cart, "items", None):
         text = "🛒 <b>Корзина</b>\n\nВаша корзина пока пуста."
@@ -127,7 +105,6 @@ async def open_cart(
     session: AsyncSession,
     db_user: User | None = None,
 ) -> None:
-    db_user = await _resolve_db_user(session, db_user, callback.from_user)
     await render_cart(callback, session, db_user)
 
 
@@ -139,7 +116,6 @@ async def cart_actions(
     db_user: User | None = None,
 ) -> None:
     db_user = await _resolve_db_user(session, db_user, callback.from_user)
-
     if db_user is None or getattr(db_user, "id", None) is None:
         await callback.answer("Пользователь не найден", show_alert=True)
         return
