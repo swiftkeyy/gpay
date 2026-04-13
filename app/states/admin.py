@@ -18,9 +18,9 @@ class AdminCrudStates(StatesGroup):
     waiting_price_product_id = State()
     waiting_price_value = State()
 
-    waiting_broadcast_text = State()
-    waiting_promo_code = State()
-
 
 class AdminCatalogStates(AdminCrudStates):
-    pass
+    waiting_broadcast_text = State()
+    waiting_promo_code = State()
+    waiting_order_search = State()
+    waiting_user_search = State()
