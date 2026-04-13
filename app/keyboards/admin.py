@@ -19,12 +19,13 @@ def admin_main_kb() -> InlineKeyboardMarkup:
     b.button(text="📢 Рассылки", callback_data=AdminCb(section="broadcasts", action="list").pack())
     b.button(text="⚙️ Настройки", callback_data=AdminCb(section="settings", action="list").pack())
     b.button(text="👥 Пользователи", callback_data=AdminCb(section="users", action="list").pack())
+    b.button(text="⭐ Отзывы", callback_data=AdminCb(section="reviews", action="list").pack())
     b.button(text="📊 Статистика", callback_data=AdminCb(section="stats", action="list").pack())
     b.button(text="🧾 Логи", callback_data=AdminCb(section="logs", action="list").pack())
     b.button(text="👮 Админы", callback_data=AdminCb(section="admins", action="list").pack())
     b.button(text="🚫 Блокировки", callback_data=AdminCb(section="blocks", action="list").pack())
     b.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
-    b.adjust(2, 2, 2, 2, 2, 2, 1, 1)
+    b.adjust(2, 2, 2, 2, 2, 2, 2, 1)
     return b.as_markup()
 
 
@@ -181,6 +182,34 @@ def claims_admin_kb(orders: list) -> InlineKeyboardMarkup:
         )
     b.button(text="🔙 К заказам", callback_data=AdminCb(section="orders", action="list").pack())
     b.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
+    b.adjust(1)
+    return b.as_markup()
+
+
+def reviews_admin_kb(reviews: list) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for review in reviews:
+        review_id = getattr(review, "id", None)
+        if review_id is None:
+            continue
+        status = "🟢" if getattr(review, "is_published", False) else "⚪️"
+        title = getattr(review, "title", None) or getattr(review, "author_name", None) or f"Отзыв #{review_id}"
+        b.button(
+            text=f"{status} {title}",
+            callback_data=AdminCb(section="reviews", action="view", entity_id=review_id).pack(),
+        )
+    b.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
+    b.adjust(1)
+    return b.as_markup()
+
+
+def review_admin_actions_kb(review_id: int, *, is_published: bool = False) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    toggle_action = "unpublish" if is_published else "publish"
+    toggle_text = "🙈 Скрыть" if is_published else "👁 Опубликовать"
+    b.button(text=toggle_text, callback_data=AdminCb(section="reviews", action=toggle_action, entity_id=review_id).pack())
+    b.button(text="🗑 Удалить", callback_data=AdminCb(section="reviews", action="delete", entity_id=review_id).pack())
+    b.button(text="🔙 К отзывам", callback_data=AdminCb(section="reviews", action="list").pack())
     b.adjust(1)
     return b.as_markup()
 
