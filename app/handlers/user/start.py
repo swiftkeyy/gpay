@@ -7,7 +7,7 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.keyboards.user import main_menu_kb
-from app.models import User
+from app.models import Admin, User
 from app.repositories.users import UserRepository
 from app.services.referral import ReferralService
 from app.services.settings import SettingsService
@@ -21,6 +21,7 @@ async def _render_home(
     target: Message | CallbackQuery,
     session: AsyncSession,
     db_user: User,
+    admin: Admin | None = None,
 ) -> None:
     settings_service = SettingsService(session)
 
@@ -34,18 +35,19 @@ async def _render_home(
     )
 
     text = main_menu_text(shop_name or "Game Pay", welcome or "Добро пожаловать в Game Pay.")
+    menu = main_menu_kb(is_admin=admin is not None)
 
     if isinstance(target, Message):
         await target.answer(
             text,
-            reply_markup=main_menu_kb(),
+            reply_markup=menu,
             parse_mode="HTML",
         )
     else:
         if target.message:
             await target.message.edit_text(
                 text,
-                reply_markup=main_menu_kb(),
+                reply_markup=menu,
                 parse_mode="HTML",
             )
         await target.answer()
@@ -57,6 +59,7 @@ async def start_handler(
     session: AsyncSession,
     db_user: User,
     state: FSMContext,
+    admin: Admin | None = None,
 ) -> None:
     await state.clear()
 
@@ -70,7 +73,7 @@ async def start_handler(
                 referral_service = ReferralService(session)
                 await referral_service.register_referral(referrer, db_user)
 
-    await _render_home(message, session, db_user)
+    await _render_home(message, session, db_user, admin)
 
 
 @router.callback_query(NavCb.filter(F.target == "home"))
@@ -79,6 +82,7 @@ async def home_callback(
     session: AsyncSession,
     db_user: User,
     state: FSMContext,
+    admin: Admin | None = None,
 ) -> None:
     await state.clear()
-    await _render_home(callback, session, db_user)
+    await _render_home(callback, session, db_user, admin)
