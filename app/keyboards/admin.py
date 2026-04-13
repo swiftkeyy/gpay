@@ -148,6 +148,7 @@ def orders_admin_kb(orders: list) -> InlineKeyboardMarkup:
             text=f"📦 {getattr(order, 'order_number', order.id)} · {getattr(order, 'status', '-')}",
             callback_data=AdminCb(section="orders", action="view", entity_id=order.id).pack(),
         )
+    b.button(text="📬 Споры и возвраты", callback_data=AdminCb(section="orders", action="claims").pack())
     b.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
     b.adjust(1)
     return b.as_markup()
@@ -165,6 +166,21 @@ def order_admin_actions_kb(order_id: int) -> InlineKeyboardMarkup:
     ]:
         b.button(text=label, callback_data=AdminCb(section="orders", action=action, entity_id=order_id).pack())
     b.button(text="🔙 К заказам", callback_data=AdminCb(section="orders", action="list").pack())
+    b.adjust(1)
+    return b.as_markup()
+
+
+def claims_admin_kb(orders: list) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for order in orders:
+        title = getattr(order, "order_number", getattr(order, "id", "-"))
+        status = getattr(order, "status", "-")
+        b.button(
+            text=f"⚠️ {title} · {status}",
+            callback_data=AdminCb(section="orders", action="view", entity_id=order.id).pack(),
+        )
+    b.button(text="🔙 К заказам", callback_data=AdminCb(section="orders", action="list").pack())
+    b.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
     b.adjust(1)
     return b.as_markup()
 
