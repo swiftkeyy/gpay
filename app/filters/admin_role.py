@@ -22,11 +22,11 @@ class AdminPermissionFilter(BaseFilter):
             return False
 
         can_manage_categories = getattr(admin, "can_manage_categories", False)
-        permission = self.rbac.normalize_permission(self.permission)
+        normalized = self.rbac.normalize_permission(self.permission)
 
         return self.rbac.has_permission(
             admin.role,
-            permission,
+            normalized,
             can_manage_categories=can_manage_categories,
         )
 
