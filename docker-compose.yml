@@ -24,7 +24,7 @@ services:
     depends_on:
       - db
       - redis
-    command: bash -lc "python seed.py && python -m app.main"
+    command: python -m app.main
     restart: unless-stopped
 
 volumes:
