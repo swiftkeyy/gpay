@@ -186,20 +186,41 @@ def claims_admin_kb(orders: list) -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def reviews_admin_kb(reviews: list) -> InlineKeyboardMarkup:
+def reviews_admin_kb(reviews: list, *, filter_status: str | None = None) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
+
+    status_buttons = [
+        ("all", "Все"),
+        ("published", "Опубликованные"),
+        ("hidden", "Скрытые"),
+        ("pending", "На модерации"),
+    ]
+    for value, title in status_buttons:
+        prefix = "✅ " if filter_status == value else ""
+        b.button(
+            text=f"{prefix}{title}",
+            callback_data=AdminCb(section="reviews", action="list", value=value).pack(),
+        )
+
     for review in reviews:
         review_id = getattr(review, "id", None)
         if review_id is None:
             continue
-        status = "🟢" if getattr(review, "is_published", False) else "⚪️"
-        title = getattr(review, "title", None) or getattr(review, "author_name", None) or f"Отзыв #{review_id}"
+        is_published = getattr(review, "is_published", False)
+        is_approved = getattr(review, "is_approved", False)
+        status = "🟢" if is_published else ("🟡" if is_approved else "⚪️")
+        title = (
+            getattr(review, "title", None)
+            or getattr(review, "author_name", None)
+            or f"Отзыв #{review_id}"
+        )
         b.button(
             text=f"{status} {title}",
             callback_data=AdminCb(section="reviews", action="view", entity_id=review_id).pack(),
         )
+
     b.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
-    b.adjust(1)
+    b.adjust(2, 2, *([1] * len(reviews)), 1)
     return b.as_markup()
 
 
