@@ -50,29 +50,28 @@ class UserContextMiddleware(BaseMiddleware):
             )
             session.add(db_user)
             await session.flush()
-            await session.commit()
-
-            result = await session.execute(
-                select(User).where(User.telegram_id == tg_user.id)
-            )
-            db_user = result.scalar_one_or_none()
         else:
-            db_user.username = tg_user.username
-            db_user.first_name = tg_user.first_name
-            db_user.last_name = tg_user.last_name
-            await session.flush()
+            changed = False
+            if db_user.username != tg_user.username:
+                db_user.username = tg_user.username
+                changed = True
+            if db_user.first_name != tg_user.first_name:
+                db_user.first_name = tg_user.first_name
+                changed = True
+            if db_user.last_name != tg_user.last_name:
+                db_user.last_name = tg_user.last_name
+                changed = True
+            if changed:
+                await session.flush()
 
         data["db_user"] = db_user
 
-        if db_user is not None:
-            admin_result = await session.execute(
-                select(Admin).where(
-                    Admin.user_id == db_user.id,
-                    Admin.is_active.is_(True),
-                )
+        admin_result = await session.execute(
+            select(Admin).where(
+                Admin.user_id == db_user.id,
+                Admin.is_active.is_(True),
             )
-            data["admin"] = admin_result.scalar_one_or_none()
-        else:
-            data["admin"] = None
+        )
+        data["admin"] = admin_result.scalar_one_or_none()
 
         return await handler(event, data)
