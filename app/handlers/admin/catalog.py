@@ -39,6 +39,63 @@ def _slugify(value: str) -> str:
     return value[:64] or "item"
 
 
+async def _ensure_unique_game_slug(session: AsyncSession, base_slug: str, *, exclude_id: int | None = None) -> str:
+    slug = base_slug or "item"
+    counter = 1
+    while True:
+        stmt = select(Game).where(Game.slug == slug)
+        if exclude_id is not None:
+            stmt = stmt.where(Game.id != exclude_id)
+        exists = await session.scalar(stmt)
+        if not exists:
+            return slug
+        suffix = f"-{counter}"
+        slug = f"{base_slug[: max(1, 64 - len(suffix))]}{suffix}" if base_slug else f"item{suffix}"
+        counter += 1
+
+
+async def _ensure_unique_category_slug(
+    session: AsyncSession,
+    *,
+    game_id: int,
+    base_slug: str,
+    exclude_id: int | None = None,
+) -> str:
+    slug = base_slug or "item"
+    counter = 1
+    while True:
+        stmt = select(Category).where(Category.game_id == game_id, Category.slug == slug)
+        if exclude_id is not None:
+            stmt = stmt.where(Category.id != exclude_id)
+        exists = await session.scalar(stmt)
+        if not exists:
+            return slug
+        suffix = f"-{counter}"
+        slug = f"{base_slug[: max(1, 64 - len(suffix))]}{suffix}" if base_slug else f"item{suffix}"
+        counter += 1
+
+
+async def _ensure_unique_product_slug(
+    session: AsyncSession,
+    *,
+    game_id: int,
+    base_slug: str,
+    exclude_id: int | None = None,
+) -> str:
+    slug = base_slug or "item"
+    counter = 1
+    while True:
+        stmt = select(Product).where(Product.game_id == game_id, Product.slug == slug)
+        if exclude_id is not None:
+            stmt = stmt.where(Product.id != exclude_id)
+        exists = await session.scalar(stmt)
+        if not exists:
+            return slug
+        suffix = f"-{counter}"
+        slug = f"{base_slug[: max(1, 64 - len(suffix))]}{suffix}" if base_slug else f"item{suffix}"
+        counter += 1
+
+
 @router.callback_query(AdminCb.filter(F.section == "games"))
 async def admin_games(callback: CallbackQuery, callback_data: AdminCb, session: AsyncSession, state: FSMContext, admin: Admin | None = None) -> None:
     if not _has_access(callback.from_user.id, admin):
@@ -106,15 +163,12 @@ async def create_game(message: Message, session: AsyncSession, state: FSMContext
     if not title:
         await message.answer("Название не должно быть пустым.")
         return
-    slug = _slugify(title)
-    exists = await session.scalar(select(Game).where(Game.slug == slug))
-    if exists:
-        slug = f"{slug}-{message.from_user.id % 10000}"
+    slug = await _ensure_unique_game_slug(session, _slugify(title))
     game = Game(slug=slug, title=title, description=None, image_id=None, is_active=True, sort_order=100, is_deleted=False)
     session.add(game)
     await session.flush()
     await state.clear()
-    await message.answer(f"✅ Игра создана: <b>{game.title}</b>", parse_mode="HTML")
+    await message.answer(f"✅ Игра создана: <b>{game.title}</b>\nSlug: <code>{game.slug}</code>", parse_mode="HTML")
 
 
 @router.message(AdminCrudStates.waiting_game_edit_title)
@@ -133,9 +187,10 @@ async def edit_game_title(message: Message, session: AsyncSession, state: FSMCon
         await message.answer("Название не должно быть пустым.")
         return
     game.title = title
+    game.slug = await _ensure_unique_game_slug(session, _slugify(title), exclude_id=game.id)
     await session.flush()
     await state.clear()
-    await message.answer(f"✅ Название игры обновлено: <b>{game.title}</b>", parse_mode="HTML")
+    await message.answer(f"✅ Название игры обновлено: <b>{game.title}</b>\nSlug: <code>{game.slug}</code>", parse_mode="HTML")
 
 
 @router.callback_query(AdminCb.filter(F.section == "categories"))
@@ -238,12 +293,12 @@ async def create_category_title(message: Message, session: AsyncSession, state: 
     if not title:
         await message.answer("Название не должно быть пустым.")
         return
-    slug = _slugify(title)
+    slug = await _ensure_unique_category_slug(session, game_id=game_id, base_slug=_slugify(title))
     category = Category(game_id=game_id, slug=slug, title=title, description=None, image_id=None, is_active=True, sort_order=100, is_deleted=False)
     session.add(category)
     await session.flush()
     await state.clear()
-    await message.answer(f"✅ Категория создана: <b>{category.title}</b>", parse_mode="HTML")
+    await message.answer(f"✅ Категория создана: <b>{category.title}</b>\nSlug: <code>{category.slug}</code>", parse_mode="HTML")
 
 
 @router.message(AdminCrudStates.waiting_category_edit_title)
@@ -262,9 +317,10 @@ async def edit_category_title(message: Message, session: AsyncSession, state: FS
         await message.answer("Название не должно быть пустым.")
         return
     category.title = title
+    category.slug = await _ensure_unique_category_slug(session, game_id=category.game_id, base_slug=_slugify(title), exclude_id=category.id)
     await session.flush()
     await state.clear()
-    await message.answer(f"✅ Название категории обновлено: <b>{category.title}</b>", parse_mode="HTML")
+    await message.answer(f"✅ Название категории обновлено: <b>{category.title}</b>\nSlug: <code>{category.slug}</code>", parse_mode="HTML")
 
 
 @router.callback_query(AdminCb.filter(F.section == "products"))
@@ -392,10 +448,15 @@ async def create_product_description(message: Message, session: AsyncSession, st
     description = (message.text or "").strip()
     if description == "-":
         description = ""
+    slug = await _ensure_unique_product_slug(
+        session,
+        game_id=category.game_id,
+        base_slug=data.get("product_slug", _slugify(data.get("product_title", "product"))),
+    )
     product = Product(
         game_id=category.game_id,
         category_id=category.id,
-        slug=data.get("product_slug", _slugify(data.get("product_title", "product"))),
+        slug=slug,
         title=data.get("product_title", "Новый товар"),
         description=description or None,
         image_id=None,
@@ -414,7 +475,7 @@ async def create_product_description(message: Message, session: AsyncSession, st
     session.add(product)
     await session.flush()
     await state.clear()
-    await message.answer(f"✅ Товар создан: <b>{product.title}</b>", parse_mode="HTML")
+    await message.answer(f"✅ Товар создан: <b>{product.title}</b>\nSlug: <code>{product.slug}</code>", parse_mode="HTML")
 
 
 @router.message(AdminCrudStates.waiting_product_edit_title)
@@ -433,6 +494,7 @@ async def edit_product_title(message: Message, session: AsyncSession, state: FSM
         await message.answer("Название не должно быть пустым.")
         return
     product.title = title
+    product.slug = await _ensure_unique_product_slug(session, game_id=product.game_id, base_slug=_slugify(title), exclude_id=product.id)
     await session.flush()
     await state.clear()
-    await message.answer(f"✅ Название товара обновлено: <b>{product.title}</b>", parse_mode="HTML")
+    await message.answer(f"✅ Название товара обновлено: <b>{product.title}</b>\nSlug: <code>{product.slug}</code>", parse_mode="HTML")
