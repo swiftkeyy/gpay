@@ -5,33 +5,58 @@ from app.models import AdminRole
 
 class RBACService:
     SUPER_ADMIN_PERMISSIONS = {
-        "manage_admins",
-        "manage_prices",
-        "manage_games",
-        "manage_categories",
-        "manage_products",
-        "manage_images",
-        "view_all_orders",
-        "manage_broadcasts",
-        "manage_promocodes",
-        "manage_discounts",
-        "manage_user_blocks",
-        "view_logs",
-        "manage_settings",
-        "manage_reviews",
-        "manage_referrals",
-        "manage_orders",
-        "view_users",
-        "admin_panel",
+        "admins.manage",
+        "broadcasts.manage",
+        "categories.manage",
+        "images.manage",
+        "logs.view",
+        "orders.manage",
+        "orders.view",
+        "prices.manage",
+        "products.manage",
+        "promos.manage",
+        "referrals.manage",
+        "reviews.manage",
+        "settings.manage",
+        "stats.view",
+        "users.block",
+        "users.view",
+        "games.manage",
+        "admin.panel",
     }
 
     ADMIN_PERMISSIONS = {
-        "manage_products",
-        "manage_orders",
-        "view_users",
-        "manage_reviews",
-        "admin_panel",
+        "orders.manage",
+        "orders.view",
+        "products.manage",
+        "reviews.manage",
+        "users.view",
+        "admin.panel",
     }
+
+    ALIASES = {
+        "admin_panel": "admin.panel",
+        "manage_admins": "admins.manage",
+        "manage_broadcasts": "broadcasts.manage",
+        "manage_categories": "categories.manage",
+        "manage_discounts": "prices.manage",
+        "manage_games": "games.manage",
+        "manage_images": "images.manage",
+        "view_logs": "logs.view",
+        "manage_orders": "orders.manage",
+        "view_all_orders": "orders.view",
+        "manage_prices": "prices.manage",
+        "manage_products": "products.manage",
+        "manage_promocodes": "promos.manage",
+        "manage_referrals": "referrals.manage",
+        "manage_reviews": "reviews.manage",
+        "manage_settings": "settings.manage",
+        "manage_user_blocks": "users.block",
+        "view_users": "users.view",
+    }
+
+    def normalize_permission(self, permission: str) -> str:
+        return self.ALIASES.get(permission, permission)
 
     def has_permission(
         self,
@@ -41,12 +66,13 @@ class RBACService:
         can_manage_categories: bool = False,
     ) -> bool:
         role_value = role.value if hasattr(role, "value") else str(role)
+        permission = self.normalize_permission(permission)
 
         if role_value == AdminRole.SUPER_ADMIN.value:
             return True
 
         if role_value == AdminRole.ADMIN.value:
-            if permission == "manage_categories":
+            if permission == "categories.manage":
                 return can_manage_categories
             return permission in self.ADMIN_PERMISSIONS
 
