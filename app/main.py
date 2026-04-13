@@ -17,6 +17,7 @@ from app.handlers.admin import orders as admin_orders
 from app.handlers.admin import panel
 from app.handlers.admin import prices as admin_prices
 from app.handlers.admin import promos as admin_promos
+from app.handlers.admin import reviews as admin_reviews
 from app.handlers.user import cart, catalog, checkout, orders, profile, reviews, start, support
 from app.middlewares.block import BlockMiddleware
 from app.middlewares.db import DbSessionMiddleware
@@ -63,6 +64,7 @@ async def main() -> None:
     dp.include_router(admin_promos.router)
     dp.include_router(admin_broadcasts.router)
     dp.include_router(admin_misc.router)
+    dp.include_router(admin_reviews.router)
 
     await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
