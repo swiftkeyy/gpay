@@ -10,7 +10,7 @@ def _safe_id(obj) -> int:
     return int(getattr(obj, "id", 0) or 0)
 
 
-def main_menu_kb() -> InlineKeyboardMarkup:
+def main_menu_kb(*, is_admin: bool = False) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
     builder.button(text="🎮 Игры", callback_data=NavCb(target="games").pack())
@@ -24,7 +24,11 @@ def main_menu_kb() -> InlineKeyboardMarkup:
     builder.button(text="🆘 Поддержка", callback_data=NavCb(target="support").pack())
     builder.button(text="ℹ️ Информация / Правила", callback_data=NavCb(target="info").pack())
 
-    builder.adjust(2, 2, 2, 2, 1, 1)
+    if is_admin:
+        builder.button(text="👮 Админка", callback_data=NavCb(target="admin_panel").pack())
+        builder.adjust(2, 2, 2, 2, 1, 1, 1)
+    else:
+        builder.adjust(2, 2, 2, 2, 1, 1)
     return builder.as_markup()
 
 
