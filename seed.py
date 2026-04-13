@@ -31,9 +31,15 @@ async def init_db() -> None:
         await conn.run_sync(Base.metadata.create_all)
 
 
-async def get_or_create_media(session, *, file_unique_id: str, telegram_file_id: str, alt_text: str,
-                              entity_type: EntityType = EntityType.DEFAULT,
-                              media_type: MediaType = MediaType.PHOTO) -> MediaFile:
+async def get_or_create_media(
+    session,
+    *,
+    file_unique_id: str,
+    telegram_file_id: str,
+    alt_text: str,
+    entity_type: EntityType = EntityType.DEFAULT,
+    media_type: MediaType = MediaType.PHOTO,
+) -> MediaFile:
     result = await session.execute(
         select(MediaFile).where(MediaFile.file_unique_id == file_unique_id)
     )
@@ -54,16 +60,26 @@ async def get_or_create_media(session, *, file_unique_id: str, telegram_file_id:
     return media
 
 
-async def get_or_create_user(session, *, telegram_id: int, username: str, first_name: str, last_name: str) -> User | None:
+async def get_or_create_user(
+    session,
+    *,
+    telegram_id: int,
+    username: str,
+    first_name: str,
+    last_name: str,
+) -> User | None:
     if not telegram_id:
         return None
 
     result = await session.execute(select(User).where(User.telegram_id == telegram_id))
     user = result.scalar_one_or_none()
     if user:
-        user.username = username
-        user.first_name = first_name
-        user.last_name = last_name
+        if not user.username:
+            user.username = username
+        if not user.first_name:
+            user.first_name = first_name
+        if not user.last_name:
+            user.last_name = last_name
         await session.flush()
         return user
 
@@ -89,8 +105,10 @@ async def get_or_create_admin(session, *, user: User | None, role: AdminRole) ->
     result = await session.execute(select(Admin).where(Admin.user_id == user.id))
     admin = result.scalar_one_or_none()
     if admin:
-        admin.role = role
-        admin.is_active = True
+        if not admin.is_active:
+            admin.is_active = True
+        if admin.role != role:
+            admin.role = role
         await session.flush()
         return admin
 
@@ -104,17 +122,18 @@ async def get_or_create_admin(session, *, user: User | None, role: AdminRole) ->
     return admin
 
 
-async def get_or_create_game(session, *, slug: str, title: str, description: str, image_id: int | None, sort_order: int) -> Game:
+async def get_or_create_game(
+    session,
+    *,
+    slug: str,
+    title: str,
+    description: str,
+    image_id: int | None,
+    sort_order: int,
+) -> Game:
     result = await session.execute(select(Game).where(Game.slug == slug))
     game = result.scalar_one_or_none()
     if game:
-        game.title = title
-        game.description = description
-        game.image_id = image_id
-        game.is_active = True
-        game.sort_order = sort_order
-        game.is_deleted = False
-        await session.flush()
         return game
 
     game = Game(
@@ -131,20 +150,21 @@ async def get_or_create_game(session, *, slug: str, title: str, description: str
     return game
 
 
-async def get_or_create_category(session, *, game_id: int, slug: str, title: str, description: str,
-                                 image_id: int | None, sort_order: int) -> Category:
+async def get_or_create_category(
+    session,
+    *,
+    game_id: int,
+    slug: str,
+    title: str,
+    description: str,
+    image_id: int | None,
+    sort_order: int,
+) -> Category:
     result = await session.execute(
         select(Category).where(Category.game_id == game_id, Category.slug == slug)
     )
     category = result.scalar_one_or_none()
     if category:
-        category.title = title
-        category.description = description
-        category.image_id = image_id
-        category.is_active = True
-        category.sort_order = sort_order
-        category.is_deleted = False
-        await session.flush()
         return category
 
     category = Category(
@@ -162,32 +182,29 @@ async def get_or_create_category(session, *, game_id: int, slug: str, title: str
     return category
 
 
-async def get_or_create_product(session, *, game_id: int, category_id: int, slug: str, title: str,
-                                description: str, image_id: int | None, fulfillment_type: FulfillmentType,
-                                requires_player_id: bool, requires_nickname: bool, requires_region: bool,
-                                requires_manual_review: bool, requires_screenshot: bool,
-                                extra_fields_schema_json: dict, sort_order: int) -> Product:
+async def get_or_create_product(
+    session,
+    *,
+    game_id: int,
+    category_id: int,
+    slug: str,
+    title: str,
+    description: str,
+    image_id: int | None,
+    fulfillment_type: FulfillmentType,
+    requires_player_id: bool,
+    requires_nickname: bool,
+    requires_region: bool,
+    requires_manual_review: bool,
+    requires_screenshot: bool,
+    extra_fields_schema_json: dict,
+    sort_order: int,
+) -> Product:
     result = await session.execute(
         select(Product).where(Product.game_id == game_id, Product.slug == slug)
     )
     product = result.scalar_one_or_none()
     if product:
-        product.category_id = category_id
-        product.title = title
-        product.description = description
-        product.image_id = image_id
-        product.fulfillment_type = fulfillment_type
-        product.requires_player_id = requires_player_id
-        product.requires_nickname = requires_nickname
-        product.requires_region = requires_region
-        product.requires_manual_review = requires_manual_review
-        product.requires_screenshot = requires_screenshot
-        product.extra_fields_schema_json = extra_fields_schema_json
-        product.is_active = True
-        product.is_featured = False
-        product.sort_order = sort_order
-        product.is_deleted = False
-        await session.flush()
         return product
 
     product = Product(
@@ -214,19 +231,20 @@ async def get_or_create_product(session, *, game_id: int, category_id: int, slug
     return product
 
 
-async def get_or_create_price(session, *, product_id: int, base_price: Decimal,
-                              discounted_price: Decimal | None, currency_code: str,
-                              changed_by_admin_id: int | None) -> Price:
+async def get_or_create_price(
+    session,
+    *,
+    product_id: int,
+    base_price: Decimal,
+    discounted_price: Decimal | None,
+    currency_code: str,
+    changed_by_admin_id: int | None,
+) -> Price:
     result = await session.execute(
         select(Price).where(Price.product_id == product_id, Price.is_active.is_(True))
     )
     price = result.scalar_one_or_none()
     if price:
-        price.base_price = base_price
-        price.discounted_price = discounted_price
-        price.currency_code = currency_code
-        price.changed_by_admin_id = changed_by_admin_id
-        await session.flush()
         return price
 
     price = Price(
@@ -244,14 +262,17 @@ async def get_or_create_price(session, *, product_id: int, base_price: Decimal,
     return price
 
 
-async def set_setting(session, *, key: str, value: str, description: str, is_public: bool = False) -> BotSetting:
+async def set_setting(
+    session,
+    *,
+    key: str,
+    value: str,
+    description: str,
+    is_public: bool = False,
+) -> BotSetting:
     result = await session.execute(select(BotSetting).where(BotSetting.key == key))
     setting = result.scalar_one_or_none()
     if setting:
-        setting.value = value
-        setting.description = description
-        setting.is_public = is_public
-        await session.flush()
         return setting
 
     setting = BotSetting(
