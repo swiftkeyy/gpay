@@ -9,7 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.keyboards.user import categories_kb, games_kb, product_kb, products_kb
-from app.models import Category, Game, Price, Product, User
+from app.models import Category, Game, Product, User
 from app.services.cart import CartService
 from app.services.pricing import PricingService
 from app.utils.callbacks import NavCb
@@ -19,18 +19,6 @@ router = Router(name="user_catalog")
 
 def _format_money(value: Decimal | int | float | str) -> str:
     return f"{Decimal(value):.2f}"
-
-
-async def _get_active_price(session: AsyncSession, product_id: int) -> Price | None:
-    result = await session.execute(
-        select(Price)
-        .where(
-            Price.product_id == product_id,
-            Price.is_active.is_(True),
-        )
-        .order_by(Price.id.desc())
-    )
-    return result.scalars().first()
 
 
 async def _resolve_db_user(
@@ -280,8 +268,8 @@ async def add_to_cart(
     await session.commit()
 
     builder = InlineKeyboardBuilder()
-    builder.button(text="✅ Оформить заказ", callback_data=NavCb(target="checkout").pack())
     builder.button(text="🛒 Открыть корзину", callback_data=NavCb(target="cart").pack())
+    builder.button(text="💳 Оформить заказ", callback_data=NavCb(target="checkout").pack())
     builder.button(text="🔙 Назад к товарам", callback_data=f"cat:{product.game_id}:{product.category_id}")
     builder.adjust(1)
 
@@ -330,13 +318,13 @@ async def buy_now(
 
     builder = InlineKeyboardBuilder()
     builder.button(text="💳 Перейти к оплате", callback_data=NavCb(target="checkout").pack())
-    builder.button(text="🛒 В корзину", callback_data=NavCb(target="cart").pack())
+    builder.button(text="🛒 Открыть корзину", callback_data=NavCb(target="cart").pack())
     builder.adjust(1)
 
     if callback.message:
         await callback.message.edit_text(
-            "✅ Товар добавлен в корзину.\n\nТеперь создадим заказ и выберем оплату.",
+            "✅ <b>Товар добавлен в корзину</b>\n\nТеперь создадим заказ и выберем оплату.",
             reply_markup=builder.as_markup(),
             parse_mode="HTML",
         )
-    await callback.answer("Переходим к оплате")ы
+    await callback.answer()
