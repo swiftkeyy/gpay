@@ -4,6 +4,7 @@ from aiogram import F, Router
 from aiogram.filters import CommandStart
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.keyboards.user import main_menu_kb
@@ -15,6 +16,16 @@ from app.utils.callbacks import NavCb
 from app.utils.texts import main_menu_text
 
 router = Router(name="user_start")
+
+
+async def _safe_answer_callback(callback: CallbackQuery) -> None:
+    try:
+        await callback.answer()
+    except TelegramBadRequest as exc:
+        text = str(exc).lower()
+        if "query is too old" in text or "query id is invalid" in text:
+            return
+        raise
 
 
 async def _render_home(
@@ -43,14 +54,15 @@ async def _render_home(
             reply_markup=menu,
             parse_mode="HTML",
         )
-    else:
-        if target.message:
-            await target.message.edit_text(
-                text,
-                reply_markup=menu,
-                parse_mode="HTML",
-            )
-        await target.answer()
+        return
+
+    if target.message:
+        await target.message.edit_text(
+            text,
+            reply_markup=menu,
+            parse_mode="HTML",
+        )
+    await _safe_answer_callback(target)
 
 
 @router.message(CommandStart())
