@@ -10,10 +10,13 @@ from aiogram.fsm.storage.redis import RedisStorage
 from redis.asyncio import Redis
 
 from app.core.config import get_settings
+from app.handlers.admin import broadcasts as admin_broadcasts
 from app.handlers.admin import catalog as admin_catalog
+from app.handlers.admin import misc as admin_misc
 from app.handlers.admin import orders as admin_orders
 from app.handlers.admin import panel
 from app.handlers.admin import prices as admin_prices
+from app.handlers.admin import promos as admin_promos
 from app.handlers.user import cart, catalog, checkout, orders, profile, reviews, start, support
 from app.middlewares.block import BlockMiddleware
 from app.middlewares.db import DbSessionMiddleware
@@ -57,6 +60,9 @@ async def main() -> None:
     dp.include_router(admin_catalog.router)
     dp.include_router(admin_orders.router)
     dp.include_router(admin_prices.router)
+    dp.include_router(admin_promos.router)
+    dp.include_router(admin_broadcasts.router)
+    dp.include_router(admin_misc.router)
 
     await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
 
