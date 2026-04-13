@@ -15,12 +15,12 @@ def main_menu_kb() -> InlineKeyboardMarkup:
 
     builder.button(text="🎮 Игры", callback_data=NavCb(target="games").pack())
     builder.button(text="🛒 Корзина", callback_data=NavCb(target="cart").pack())
-    builder.button(text="📦 Мои заказы", callback_data=NavCb(target="orders").pack())
-    builder.button(text="🕘 История заказов", callback_data=NavCb(target="history").pack())
+    builder.button(text="📦 Мои заказы", callback_data=NavCb(target="orders_current").pack())
+    builder.button(text="🕘 История заказов", callback_data=NavCb(target="orders_history").pack())
     builder.button(text="🎁 Промокод", callback_data=NavCb(target="promo").pack())
     builder.button(text="⭐ Отзывы", callback_data=NavCb(target="reviews").pack())
     builder.button(text="👤 Профиль", callback_data=NavCb(target="profile").pack())
-    builder.button(text="🤝 Реферальная система", callback_data=NavCb(target="referrals").pack())
+    builder.button(text="🤝 Реферальная система", callback_data=NavCb(target="ref").pack())
     builder.button(text="🆘 Поддержка", callback_data=NavCb(target="support").pack())
     builder.button(text="ℹ️ Информация / Правила", callback_data=NavCb(target="info").pack())
 
@@ -129,7 +129,7 @@ def order_actions_kb(order_id: int) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🔄 Повторить заказ", callback_data=f"order:repeat:{order_id}")
     builder.button(text="🕘 История статусов", callback_data=f"order:history:{order_id}")
-    builder.button(text="🔙 К заказам", callback_data=NavCb(target="orders").pack())
+    builder.button(text="🔙 К заказам", callback_data=NavCb(target="orders_current").pack())
     builder.adjust(1)
     return builder.as_markup()
 

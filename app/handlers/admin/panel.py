@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.models import Admin, Game
-from app.utils.callbacks import NavCb
+from app.utils.callbacks import AdminCb, NavCb
 
 router = Router(name="admin_panel")
 settings = get_settings()
@@ -57,11 +57,11 @@ def _slugify(value: str) -> str:
 
 def _admin_main_kb() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
-    b.button(text="📦 Заказы", callback_data=NavCb(target="admin_orders").pack())
+    b.button(text="📦 Заказы", callback_data=AdminCb(section="orders", action="list").pack())
     b.button(text="🎮 Игры", callback_data=NavCb(target="admin_games").pack())
-    b.button(text="🗂 Категории", callback_data=NavCb(target="admin_categories").pack())
-    b.button(text="🛍 Товары", callback_data=NavCb(target="admin_products").pack())
-    b.button(text="💸 Цены", callback_data=NavCb(target="admin_prices").pack())
+    b.button(text="🗂 Категории", callback_data=AdminCb(section="categories", action="list").pack())
+    b.button(text="🛍 Товары", callback_data=AdminCb(section="products", action="list").pack())
+    b.button(text="💸 Цены", callback_data=AdminCb(section="prices", action="list").pack())
     b.adjust(1)
     return b.as_markup()
 

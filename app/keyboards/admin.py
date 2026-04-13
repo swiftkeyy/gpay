@@ -10,12 +10,13 @@ from app.utils.callbacks import AdminCb, NavCb
 
 def admin_main_kb() -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
+    b.button(text="📦 Заказы", callback_data=AdminCb(section="orders", action="list").pack())
     b.button(text="🎮 Игры", callback_data=AdminCb(section="games", action="list").pack())
     b.button(text="🗂 Категории", callback_data=AdminCb(section="categories", action="list").pack())
     b.button(text="🛍 Товары", callback_data=AdminCb(section="products", action="list").pack())
     b.button(text="💸 Цены", callback_data=AdminCb(section="prices", action="list").pack())
     b.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
-    b.adjust(2, 2, 1)
+    b.adjust(2, 2, 1, 1)
     return b.as_markup()
 
 
@@ -120,6 +121,34 @@ def prices_admin_kb(rows: list[tuple]) -> InlineKeyboardMarkup:
             callback_data=AdminCb(section="prices", action="set", entity_id=product.id).pack(),
         )
     b.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
+    b.adjust(1)
+    return b.as_markup()
+
+
+def orders_admin_kb(orders: list) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for order in orders:
+        b.button(
+            text=f"📦 {order.order_number} · {order.status}",
+            callback_data=AdminCb(section="orders", action="view", entity_id=order.id).pack(),
+        )
+    b.button(text="🔙 В админку", callback_data=NavCb(target="admin_panel").pack())
+    b.adjust(1)
+    return b.as_markup()
+
+
+def order_admin_actions_kb(order_id: int) -> InlineKeyboardMarkup:
+    b = InlineKeyboardBuilder()
+    for action, label in [
+        ("waiting_payment", "⏳ Ожидает оплату"),
+        ("paid", "✅ Оплачен"),
+        ("processing", "🛠 В обработке"),
+        ("fulfilled", "📬 Выдан"),
+        ("completed", "🏁 Завершён"),
+        ("canceled", "❌ Отменён"),
+    ]:
+        b.button(text=label, callback_data=AdminCb(section="orders", action=action, entity_id=order_id).pack())
+    b.button(text="🔙 К заказам", callback_data=AdminCb(section="orders", action="list").pack())
     b.adjust(1)
     return b.as_markup()
 
