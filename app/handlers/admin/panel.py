@@ -51,6 +51,7 @@ async def _build_panel_text(session: AsyncSession) -> str:
 async def _render_admin_panel(target: Message | CallbackQuery, session: AsyncSession) -> None:
     text = await _build_panel_text(session)
     markup = admin_main_kb()
+
     if isinstance(target, Message):
         await target.answer(text, reply_markup=markup, parse_mode="HTML")
     else:
@@ -66,7 +67,7 @@ async def admin_command(
     admin: Admin | None = None,
 ) -> None:
     if message.from_user is None or not _has_access(admin, message.from_user.id):
-        await message.answer("Доступ запрещён.")
+        await message.answer("⛔ У вас нет доступа к админ-панели.")
         return
     await _render_admin_panel(message, session)
 
@@ -78,6 +79,6 @@ async def open_admin_panel(
     admin: Admin | None = None,
 ) -> None:
     if callback.from_user is None or not _has_access(admin, callback.from_user.id):
-        await callback.answer("Доступ запрещён", show_alert=True)
+        await callback.answer("Нет доступа", show_alert=True)
         return
     await _render_admin_panel(callback, session)
