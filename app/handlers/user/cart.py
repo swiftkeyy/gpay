@@ -15,13 +15,22 @@ from app.utils.callbacks import CartCb, NavCb
 router = Router(name="user_cart")
 
 
-async def _resolve_db_user(session: AsyncSession, tg_user) -> User | None:
+def _format_money(value: Decimal | int | float | str) -> str:
+    return f"{Decimal(value):.2f}"
+
+
+async def _resolve_db_user(
+    session: AsyncSession,
+    db_user: User | None,
+    tg_user,
+) -> User | None:
+    if db_user is not None and getattr(db_user, "id", None) is not None:
+        return db_user
+
     if tg_user is None:
         return None
 
-    result = await session.execute(
-        select(User).where(User.telegram_id == tg_user.id)
-    )
+    result = await session.execute(select(User).where(User.telegram_id == tg_user.id))
     user = result.scalar_one_or_none()
 
     if user is not None:
@@ -54,52 +63,62 @@ async def _resolve_db_user(session: AsyncSession, tg_user) -> User | None:
     return user
 
 
-def _fmt_amount(value: Decimal | int | float) -> str:
-    try:
-        return f"{Decimal(value):.2f}"
-    except Exception:
-        return str(value)
+async def render_cart(
+    target: CallbackQuery,
+    session: AsyncSession,
+    db_user: User | None,
+) -> None:
+    if db_user is None or getattr(db_user, "id", None) is None:
+        if target.message:
+            await target.message.edit_text(
+                "🛒 <b>Корзина</b>\n\nВаша корзина пока пуста.",
+                reply_markup=cart_kb([]),
+                parse_mode="HTML",
+            )
+        await target.answer()
+        return
 
-
-async def _render_cart(callback: CallbackQuery, session: AsyncSession, db_user: User) -> None:
     cart_service = CartService(session)
-    cart = await cart_service.get_cart(db_user.id)
     totals = await cart_service.get_cart_totals(db_user)
+    cart = await cart_service.get_cart(db_user.id)
 
     if cart is None or not getattr(cart, "items", None):
-        text = "🛒 <b>Корзина</b>\n\nВаша корзина пуста."
-        if callback.message:
-            await callback.message.edit_text(
+        text = "🛒 <b>Корзина</b>\n\nВаша корзина пока пуста."
+        if target.message:
+            await target.message.edit_text(
                 text,
                 reply_markup=cart_kb([]),
                 parse_mode="HTML",
             )
-        await callback.answer()
+        await target.answer()
         return
 
     lines: list[str] = ["🛒 <b>Корзина</b>\n"]
 
-    for row in totals["items"]:
-        item = row["item"]
-        quote = row["quote"]
-        title = getattr(item.product, "title", f"Товар #{item.product_id}")
+    for entry in totals["items"]:
+        item = entry["item"]
+        product = entry["product"]
+        quote = entry["quote"]
+
         lines.append(
-            f"• <b>{title}</b>\n"
-            f"  Кол-во: <b>{item.quantity}</b>\n"
-            f"  Сумма: <b>{_fmt_amount(quote.final_price)} {quote.currency_code}</b>\n"
+            f"• <b>{product.title}</b>\n"
+            f"  Кол-во: {item.quantity}\n"
+            f"  Сумма: {_format_money(quote.final_price)} {quote.currency_code}\n"
         )
 
-    lines.append(f"💵 Подытог: <b>{_fmt_amount(totals['subtotal'])} {totals['currency_code']}</b>")
-    lines.append(f"🎁 Скидка: <b>{_fmt_amount(totals['discount'])} {totals['currency_code']}</b>")
-    lines.append(f"💳 Итого: <b>{_fmt_amount(totals['total'])} {totals['currency_code']}</b>")
+    lines.append(f"\nПромежуточный итог: <b>{_format_money(totals['subtotal'])} {totals['currency_code']}</b>")
+    lines.append(f"Скидка: <b>{_format_money(totals['discount'])} {totals['currency_code']}</b>")
+    lines.append(f"Итого: <b>{_format_money(totals['total'])} {totals['currency_code']}</b>")
 
-    if callback.message:
-        await callback.message.edit_text(
-            "\n".join(lines),
+    text = "\n".join(lines)
+
+    if target.message:
+        await target.message.edit_text(
+            text,
             reply_markup=cart_kb(cart),
             parse_mode="HTML",
         )
-    await callback.answer()
+    await target.answer()
 
 
 @router.callback_query(NavCb.filter(F.target == "cart"))
@@ -108,14 +127,8 @@ async def open_cart(
     session: AsyncSession,
     db_user: User | None = None,
 ) -> None:
-    if db_user is None:
-        db_user = await _resolve_db_user(session, callback.from_user)
-
-    if db_user is None:
-        await callback.answer("Пользователь не найден", show_alert=True)
-        return
-
-    await _render_cart(callback, session, db_user)
+    db_user = await _resolve_db_user(session, db_user, callback.from_user)
+    await render_cart(callback, session, db_user)
 
 
 @router.callback_query(CartCb.filter())
@@ -125,26 +138,36 @@ async def cart_actions(
     session: AsyncSession,
     db_user: User | None = None,
 ) -> None:
-    if db_user is None:
-        db_user = await _resolve_db_user(session, callback.from_user)
+    db_user = await _resolve_db_user(session, db_user, callback.from_user)
 
-    if db_user is None:
+    if db_user is None or getattr(db_user, "id", None) is None:
         await callback.answer("Пользователь не найден", show_alert=True)
         return
 
     cart_service = CartService(session)
 
-    if callback_data.action == "inc" and callback_data.item_id:
-        await cart_service.change_quantity(db_user, callback_data.item_id, 1)
+    if callback_data.action == "clear":
+        await cart_service.clear(db_user.id)
         await session.commit()
-    elif callback_data.action == "dec" and callback_data.item_id:
-        await cart_service.change_quantity(db_user, callback_data.item_id, -1)
-        await session.commit()
-    elif callback_data.action == "del" and callback_data.item_id:
-        await cart_service.remove_item(db_user, callback_data.item_id)
-        await session.commit()
-    elif callback_data.action == "clear":
-        await cart_service.clear_cart(db_user)
-        await session.commit()
+        await render_cart(callback, session, db_user)
+        return
 
-    await _render_cart(callback, session, db_user)
+    if callback_data.action == "inc" and callback_data.item_id:
+        await cart_service.change_quantity(callback_data.item_id, 1)
+        await session.commit()
+        await render_cart(callback, session, db_user)
+        return
+
+    if callback_data.action == "dec" and callback_data.item_id:
+        await cart_service.change_quantity(callback_data.item_id, -1)
+        await session.commit()
+        await render_cart(callback, session, db_user)
+        return
+
+    if callback_data.action == "del" and callback_data.item_id:
+        await cart_service.remove_item(callback_data.item_id)
+        await session.commit()
+        await render_cart(callback, session, db_user)
+        return
+
+    await callback.answer("Неизвестное действие", show_alert=True)
