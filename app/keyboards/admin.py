@@ -15,8 +15,14 @@ def admin_main_kb() -> InlineKeyboardMarkup:
     b.button(text="🗂 Категории", callback_data=AdminCb(section="categories", action="list").pack())
     b.button(text="🛍 Товары", callback_data=AdminCb(section="products", action="list").pack())
     b.button(text="💸 Цены", callback_data=AdminCb(section="prices", action="list").pack())
+    b.button(text="🎁 Промокоды", callback_data=AdminCb(section="promos", action="list").pack())
+    b.button(text="📢 Рассылки", callback_data=AdminCb(section="broadcasts", action="list").pack())
+    b.button(text="⚙️ Настройки", callback_data=AdminCb(section="settings", action="list").pack())
+    b.button(text="👥 Пользователи", callback_data=AdminCb(section="users", action="list").pack())
+    b.button(text="📊 Статистика", callback_data=AdminCb(section="stats", action="list").pack())
+    b.button(text="🧾 Логи", callback_data=AdminCb(section="logs", action="list").pack())
     b.button(text="🏠 В меню", callback_data=NavCb(target="home").pack())
-    b.adjust(2, 2, 1, 1)
+    b.adjust(2, 2, 2, 2, 2, 1, 1)
     return b.as_markup()
 
 
