@@ -1,4 +1,5 @@
 from functools import lru_cache
+from decimal import Decimal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -33,6 +34,23 @@ class Settings(BaseSettings):
     shop_name: str = Field("Game Pay", alias="SHOP_NAME")
     super_admin_tg_id: int = Field(0, alias="SUPER_ADMIN_TG_ID")
     second_admin_tg_id: int = Field(0, alias="SECOND_ADMIN_TG_ID")
+
+    telegram_stars_enabled: bool = Field(True, alias="TELEGRAM_STARS_ENABLED")
+    telegram_stars_per_rub: Decimal = Field(Decimal("1"), alias="TELEGRAM_STARS_PER_RUB")
+
+    cryptobot_enabled: bool = Field(True, alias="CRYPTOBOT_ENABLED")
+    cryptobot_api_token: str | None = Field(None, alias="CRYPTOBOT_API_TOKEN")
+    cryptobot_api_base_url: str = Field("https://pay.crypt.bot/api", alias="CRYPTOBOT_API_BASE_URL")
+    cryptobot_currency_type: str = Field("fiat", alias="CRYPTOBOT_CURRENCY_TYPE")
+    cryptobot_fiat: str = Field("RUB", alias="CRYPTOBOT_FIAT")
+    cryptobot_asset: str = Field("USDT", alias="CRYPTOBOT_ASSET")
+    cryptobot_accepted_assets: str = Field(
+        "USDT,TON,BTC,ETH,LTC,BNB,TRX,USDC",
+        alias="CRYPTOBOT_ACCEPTED_ASSETS",
+    )
+    cryptobot_expires_in: int = Field(3600, alias="CRYPTOBOT_EXPIRES_IN")
+    cryptobot_allow_comments: bool = Field(False, alias="CRYPTOBOT_ALLOW_COMMENTS")
+    cryptobot_allow_anonymous: bool = Field(False, alias="CRYPTOBOT_ALLOW_ANONYMOUS")
 
     @property
     def database_url(self) -> str:
