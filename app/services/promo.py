@@ -21,7 +21,7 @@ class PromoService:
 
     async def validate_code(self, code: str, *, user: User, product_ids: list[int], game_ids: list[int]) -> PromoCode:
         promo = await self.repo.get_by_code(code)
-        if promo is None or not promo.is_enabled:
+        if promo is None or not promo.is_active:
             raise PromoValidationError('Промокод не найден или отключён.')
 
         now = datetime.now(timezone.utc)
@@ -29,7 +29,7 @@ class PromoService:
             raise PromoValidationError('Промокод ещё не активен.')
         if promo.ends_at and promo.ends_at < now:
             raise PromoValidationError('Срок действия промокода истёк.')
-        if promo.usage_limit is not None and promo.used_count >= promo.usage_limit:
+        if promo.max_usages is not None and promo.used_count >= promo.max_usages:
             raise PromoValidationError('Лимит использования промокода исчерпан.')
         if promo.game_id and promo.game_id not in game_ids:
             raise PromoValidationError('Промокод не подходит для выбранной игры.')
