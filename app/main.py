@@ -66,6 +66,11 @@ async def run_migrations() -> None:
                 "CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'rejected', 'canceled')",
                 "CREATE TYPE dispute_status_enum AS ENUM ('open', 'in_review', 'resolved', 'closed')",
                 "CREATE TYPE notification_type_enum AS ENUM ('new_message', 'new_order', 'order_status', 'payment', 'review', 'system', 'price_alert')",
+                "CREATE TYPE promo_type_enum AS ENUM ('percent', 'fixed')",
+                "CREATE TYPE review_status_enum AS ENUM ('pending', 'published', 'rejected')",
+                "CREATE TYPE broadcast_status_enum AS ENUM ('draft', 'scheduled', 'in_progress', 'completed', 'failed')",
+                "CREATE TYPE audit_action_enum AS ENUM ('create', 'update', 'delete', 'view', 'login', 'logout', 'other')",
+                "CREATE TYPE block_action_scope_enum AS ENUM ('global', 'catalog', 'orders', 'support', 'reviews')",
             ]
             
             for enum_sql in enums:
@@ -76,6 +81,109 @@ async def run_migrations() -> None:
             
             # Create tables (simplified - only if not exists)
             tables = [
+                # Promo codes
+                """CREATE TABLE IF NOT EXISTS promo_codes (
+                    id SERIAL PRIMARY KEY, code VARCHAR(50) NOT NULL UNIQUE,
+                    promo_type promo_type_enum NOT NULL, value NUMERIC(12, 2) NOT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT true, max_usages INTEGER,
+                    used_count INTEGER NOT NULL DEFAULT 0, starts_at TIMESTAMP WITH TIME ZONE,
+                    ends_at TIMESTAMP WITH TIME ZONE, game_id INTEGER REFERENCES games(id) ON DELETE CASCADE,
+                    product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
+                    only_new_users BOOLEAN NOT NULL DEFAULT false, is_deleted BOOLEAN NOT NULL DEFAULT false,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_promo_codes_code ON promo_codes(code)",
+                
+                """CREATE TABLE IF NOT EXISTS promo_code_usages (
+                    id SERIAL PRIMARY KEY, promo_code_id INTEGER NOT NULL REFERENCES promo_codes(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                    used_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_promo_code_usages_promo_user ON promo_code_usages(promo_code_id, user_id)",
+                
+                # Referrals
+                """CREATE TABLE IF NOT EXISTS referrals (
+                    id SERIAL PRIMARY KEY, referrer_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    referred_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    referral_code VARCHAR(50) NOT NULL, first_order_id INTEGER REFERENCES orders(id) ON DELETE SET NULL,
+                    is_rewarded BOOLEAN NOT NULL DEFAULT false,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    CONSTRAINT uq_referrals_referred_user_id UNIQUE (referred_user_id)
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_referrals_referrer ON referrals(referrer_user_id)",
+                
+                """CREATE TABLE IF NOT EXISTS referral_rewards (
+                    id SERIAL PRIMARY KEY, referral_id INTEGER NOT NULL REFERENCES referrals(id) ON DELETE CASCADE,
+                    referrer_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    referred_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                    amount NUMERIC(12, 2) NOT NULL, description TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_referral_rewards_referrer ON referral_rewards(referrer_user_id)",
+                
+                # Reviews
+                """CREATE TABLE IF NOT EXISTS reviews (
+                    id SERIAL PRIMARY KEY, order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+                    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    rating INTEGER NOT NULL CHECK (rating >= 1 AND rating <= 5), text TEXT,
+                    status review_status_enum NOT NULL DEFAULT 'published',
+                    admin_reply TEXT, admin_replied_at TIMESTAMP WITH TIME ZONE,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_reviews_status_created ON reviews(status, created_at)",
+                
+                # Bot settings
+                """CREATE TABLE IF NOT EXISTS bot_settings (
+                    id SERIAL PRIMARY KEY, key VARCHAR(100) NOT NULL UNIQUE,
+                    value TEXT NOT NULL, description TEXT, is_public BOOLEAN NOT NULL DEFAULT false,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_bot_settings_key ON bot_settings(key)",
+                
+                # Broadcasts
+                """CREATE TABLE IF NOT EXISTS broadcasts (
+                    id SERIAL PRIMARY KEY, message_text TEXT NOT NULL,
+                    media_id INTEGER REFERENCES media_files(id) ON DELETE SET NULL,
+                    status broadcast_status_enum NOT NULL DEFAULT 'draft',
+                    scheduled_at TIMESTAMP WITH TIME ZONE, started_at TIMESTAMP WITH TIME ZONE,
+                    completed_at TIMESTAMP WITH TIME ZONE, total_users INTEGER NOT NULL DEFAULT 0,
+                    sent_count INTEGER NOT NULL DEFAULT 0, failed_count INTEGER NOT NULL DEFAULT 0,
+                    created_by_admin_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_broadcasts_status ON broadcasts(status)",
+                
+                # Audit logs
+                """CREATE TABLE IF NOT EXISTS audit_logs (
+                    id SERIAL PRIMARY KEY, admin_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
+                    action audit_action_enum NOT NULL, entity_type VARCHAR(50),
+                    entity_id INTEGER, description TEXT, metadata_json JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    ip_address VARCHAR(45), user_agent TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_audit_logs_entity_created ON audit_logs(entity_type, created_at)",
+                "CREATE INDEX IF NOT EXISTS ix_audit_logs_admin_created ON audit_logs(admin_id, created_at)",
+                
+                # User blocks
+                """CREATE TABLE IF NOT EXISTS user_blocks (
+                    id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    scope block_action_scope_enum NOT NULL, reason TEXT,
+                    blocked_by_admin_id INTEGER REFERENCES admins(id) ON DELETE SET NULL,
+                    expires_at TIMESTAMP WITH TIME ZONE,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+                )""",
+                "CREATE INDEX IF NOT EXISTS ix_user_blocks_user_scope ON user_blocks(user_id, scope)",
+                
+                # Marketplace tables
                 """CREATE TABLE IF NOT EXISTS sellers (
                     id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
                     status seller_status_enum NOT NULL DEFAULT 'pending', shop_name VARCHAR(120) NOT NULL,
