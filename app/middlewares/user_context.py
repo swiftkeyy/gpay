@@ -46,7 +46,7 @@ class UserContextMiddleware(BaseMiddleware):
         db_user = result.scalar_one_or_none()
 
         if db_user is None:
-            logger.info(f"Creating new user: telegram_id={tg_user.id}, username={tg_user.username}")
+            logger.warning(f"Creating new user: telegram_id={tg_user.id}, username={tg_user.username}")
             db_user = User(
                 telegram_id=tg_user.id,
                 username=tg_user.username,
@@ -60,9 +60,9 @@ class UserContextMiddleware(BaseMiddleware):
             session.add(db_user)
             await session.flush()
             await session.refresh(db_user)
-            logger.info(f"User created: id={db_user.id}, telegram_id={db_user.telegram_id}")
+            logger.warning(f"User created: id={db_user.id}, telegram_id={db_user.telegram_id}")
         else:
-            logger.debug(f"User found: id={db_user.id}, telegram_id={db_user.telegram_id}")
+            logger.warning(f"User found: id={db_user.id}, telegram_id={db_user.telegram_id}")
             changed = False
             if db_user.username != tg_user.username:
                 db_user.username = tg_user.username
@@ -77,7 +77,7 @@ class UserContextMiddleware(BaseMiddleware):
                 await session.flush()
 
         data["db_user"] = db_user
-        logger.debug(f"Setting db_user in data: id={db_user.id if db_user else None}")
+        logger.warning(f"Setting db_user in data: id={db_user.id if db_user else None}, telegram_id={db_user.telegram_id if db_user else None}")
 
         admin_result = await session.execute(
             select(Admin).where(
