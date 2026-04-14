@@ -12,7 +12,7 @@ sys.path.insert(0, '/app')
 
 try:
     from sqlalchemy import text
-    from app.db.session import async_session_maker
+    from app.db.session import session_factory
     print("✅ Imports successful")
 except Exception as e:
     print(f"❌ Import error: {e}")
@@ -296,7 +296,7 @@ async def apply_migration():
     ]
     
     try:
-        async with async_session_maker() as session:
+        async with session_factory() as session:
             print(f"🔄 Applying {len(migrations)} migration statements...")
             
             for i, sql in enumerate(migrations, 1):

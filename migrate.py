@@ -5,10 +5,10 @@ import sys
 sys.path.insert(0, '/app')
 
 from sqlalchemy import text
-from app.db.session import async_session_maker
+from app.db.session import session_factory
 
 async def main():
-    async with async_session_maker() as session:
+    async with session_factory() as session:
         # Just add balance column - most critical
         await session.execute(text(
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS balance NUMERIC(12, 2) NOT NULL DEFAULT 0.00"

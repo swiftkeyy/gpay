@@ -5,7 +5,7 @@ Run this from bothost.ru web terminal: python check_db.py
 import asyncio
 import logging
 from sqlalchemy import text
-from app.db.session import async_session_maker
+from app.db.session import session_factory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,7 +15,7 @@ async def check_database():
     """Check database connection and table status."""
     
     try:
-        async with async_session_maker() as session:
+        async with session_factory() as session:
             logger.info("✅ Database connection successful!")
             
             # Check if users table has balance column

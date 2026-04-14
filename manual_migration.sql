@@ -1,20 +1,3 @@
-"""
-Script to run database migrations automatically.
-This can be executed from bothost.ru web terminal.
-"""
-import asyncio
-import logging
-from sqlalchemy import text
-from app.db.session import session_factory
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-async def run_migrations():
-    """Apply all pending database migrations."""
-    
-    migration_sql = """
 -- Manual migration for marketplace features
 -- Execute this SQL in your PostgreSQL database
 
@@ -278,33 +261,6 @@ CREATE INDEX IF NOT EXISTS ix_notifications_user_read_created ON notifications(u
 -- 14. Update alembic version
 INSERT INTO alembic_version (version_num) VALUES ('20260414_000001')
 ON CONFLICT (version_num) DO NOTHING;
-"""
-    
-    try:
-        async with session_factory() as session:
-            logger.info("Starting database migration...")
-            
-            # Split by semicolon and execute each statement
-            statements = [s.strip() for s in migration_sql.split(';') if s.strip()]
-            
-            for i, statement in enumerate(statements, 1):
-                if statement:
-                    try:
-                        await session.execute(text(statement))
-                        logger.info(f"Executed statement {i}/{len(statements)}")
-                    except Exception as e:
-                        # Log but continue - some statements might fail if already applied
-                        logger.warning(f"Statement {i} warning: {e}")
-            
-            await session.commit()
-            logger.info("✅ Migration completed successfully!")
-            return True
-            
-    except Exception as e:
-        logger.error(f"❌ Migration failed: {e}")
-        return False
 
-
-if __name__ == "__main__":
-    success = asyncio.run(run_migrations())
-    exit(0 if success else 1)
+-- Done!
+SELECT 'Migration completed successfully!' as status;
