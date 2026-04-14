@@ -14,10 +14,14 @@ router = Router(name="seller")
 
 
 @router.message(Command("seller"))
-async def seller_menu_cmd(message: Message, session: AsyncSession):
+async def seller_menu_cmd(message: Message, session: AsyncSession, db_user):
     """Seller menu"""
+    if not db_user:
+        await message.answer("Ошибка: пользователь не найден")
+        return
+    
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(message.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await message.answer(
@@ -46,8 +50,12 @@ async def seller_menu_cmd(message: Message, session: AsyncSession):
 
 
 @router.message(SellerStates.waiting_shop_name)
-async def process_shop_name(message: Message, state: FSMContext, session: AsyncSession):
+async def process_shop_name(message: Message, state: FSMContext, session: AsyncSession, db_user):
     """Process shop name for new seller"""
+    if not db_user:
+        await message.answer("Ошибка: пользователь не найден")
+        return
+    
     shop_name = message.text.strip()
     
     if len(shop_name) < 3:
@@ -56,7 +64,7 @@ async def process_shop_name(message: Message, state: FSMContext, session: AsyncS
     
     seller_service = SellerService(session)
     seller = await seller_service.create_seller(
-        user_id=message.from_user.id,
+        user_id=db_user.id,
         shop_name=shop_name
     )
     await session.commit()
@@ -71,10 +79,14 @@ async def process_shop_name(message: Message, state: FSMContext, session: AsyncS
 
 
 @router.callback_query(F.data == "seller:my_lots")
-async def my_lots_callback(callback: CallbackQuery, session: AsyncSession):
+async def my_lots_callback(callback: CallbackQuery, session: AsyncSession, db_user):
     """Show seller's lots"""
+    if not db_user:
+        await callback.answer("Ошибка: пользователь не найден", show_alert=True)
+        return
+    
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
@@ -196,10 +208,14 @@ async def lot_action_callback(callback: CallbackQuery, session: AsyncSession):
 
 
 @router.callback_query(F.data == "seller:balance")
-async def seller_balance_callback(callback: CallbackQuery, session: AsyncSession):
+async def seller_balance_callback(callback: CallbackQuery, session: AsyncSession, db_user):
     """Show seller balance and transactions"""
+    if not db_user:
+        await callback.answer("Ошибка: пользователь не найден", show_alert=True)
+        return
+    
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
@@ -208,7 +224,7 @@ async def seller_balance_callback(callback: CallbackQuery, session: AsyncSession
     from app.repositories.transactions import TransactionRepository
     transaction_repo = TransactionRepository(session)
     transactions = await transaction_repo.get_user_transactions(
-        user_id=callback.from_user.id,
+        user_id=db_user.id,
         limit=10
     )
     
@@ -226,10 +242,14 @@ async def seller_balance_callback(callback: CallbackQuery, session: AsyncSession
 
 
 @router.callback_query(F.data == "seller:withdraw")
-async def seller_withdraw_callback(callback: CallbackQuery, session: AsyncSession):
+async def seller_withdraw_callback(callback: CallbackQuery, session: AsyncSession, db_user):
     """Request withdrawal"""
+    if not db_user:
+        await callback.answer("Ошибка: пользователь не найден", show_alert=True)
+        return
+    
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
@@ -252,10 +272,14 @@ async def seller_withdraw_callback(callback: CallbackQuery, session: AsyncSessio
 
 
 @router.callback_query(F.data == "seller:add_lot")
-async def add_lot_callback(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+async def add_lot_callback(callback: CallbackQuery, session: AsyncSession, state: FSMContext, db_user):
     """Start adding new lot"""
+    if not db_user:
+        await callback.answer("Ошибка: пользователь не найден", show_alert=True)
+        return
+    
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
@@ -360,8 +384,12 @@ async def process_lot_description(message: Message, state: FSMContext):
 
 
 @router.message(SellerStates.waiting_lot_price)
-async def process_lot_price(message: Message, state: FSMContext, session: AsyncSession):
+async def process_lot_price(message: Message, state: FSMContext, session: AsyncSession, db_user):
     """Process lot price and create lot"""
+    if not db_user:
+        await message.answer("Ошибка: пользователь не найден")
+        return
+    
     try:
         from decimal import Decimal
         price = Decimal(message.text.strip().replace(",", "."))
@@ -380,7 +408,7 @@ async def process_lot_price(message: Message, state: FSMContext, session: AsyncS
     
     # Get seller
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(message.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await message.answer("Ошибка: вы не зарегистрированы как продавец")
@@ -484,10 +512,14 @@ async def process_stock_items(message: Message, state: FSMContext, session: Asyn
 
 
 @router.callback_query(F.data == "seller:stats")
-async def seller_stats_callback(callback: CallbackQuery, session: AsyncSession):
+async def seller_stats_callback(callback: CallbackQuery, session: AsyncSession, db_user):
     """Show seller statistics"""
+    if not db_user:
+        await callback.answer("Ошибка: пользователь не найден", show_alert=True)
+        return
+    
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
@@ -522,10 +554,14 @@ async def seller_stats_callback(callback: CallbackQuery, session: AsyncSession):
 
 
 @router.callback_query(F.data == "seller:sales")
-async def seller_sales_callback(callback: CallbackQuery, session: AsyncSession):
+async def seller_sales_callback(callback: CallbackQuery, session: AsyncSession, db_user):
     """Show seller sales"""
+    if not db_user:
+        await callback.answer("Ошибка: пользователь не найден", show_alert=True)
+        return
+    
     seller_service = SellerService(session)
-    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    seller = await seller_service.get_seller_by_user_id(db_user.id)
     
     if not seller:
         await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
