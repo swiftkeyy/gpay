@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from aiogram import F, Router
 from aiogram.types import CallbackQuery
+from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,15 @@ from app.utils.callbacks import AdminCb, NavCb
 router = Router(name="admin_misc")
 
 
+async def _safe_answer(callback: CallbackQuery) -> None:
+    """Safely answer callback query, ignoring 'too old' errors"""
+    try:
+        await callback.answer()
+    except TelegramBadRequest as e:
+        if "query is too old" not in str(e).lower():
+            raise
+
+
 @router.callback_query(NavCb.filter(F.target == "admin_home"), AdminPermissionFilter("orders.view"))
 async def admin_home(callback: CallbackQuery) -> None:
     await callback.message.edit_text(
@@ -22,7 +32,7 @@ async def admin_home(callback: CallbackQuery) -> None:
         reply_markup=admin_back_kb(),
         parse_mode="HTML",
     )
-    await callback.answer()
+    await _safe_answer(callback)
 
 
 @router.callback_query(AdminCb.filter(F.section == "settings"), AdminPermissionFilter("settings.manage"))
@@ -31,7 +41,7 @@ async def admin_settings(callback: CallbackQuery, session: AsyncSession) -> None
     lines = [f"• <code>{item.key}</code> = <b>{item.value}</b>" for item in settings]
     text = "⚙️ <b>Настройки</b>\n\n" + ("\n".join(lines) if lines else "Настроек пока нет.")
     await callback.message.edit_text(text, reply_markup=admin_back_kb(), parse_mode="HTML")
-    await callback.answer()
+    await _safe_answer(callback)
 
 
 @router.callback_query(AdminCb.filter(F.section == "users"), AdminPermissionFilter("users.view"))
@@ -45,7 +55,7 @@ async def admin_users(callback: CallbackQuery, session: AsyncSession) -> None:
         if users else "Пользователей пока нет."
     )
     await callback.message.edit_text(text, reply_markup=admin_back_kb(), parse_mode="HTML")
-    await callback.answer()
+    await _safe_answer(callback)
 
 
 @router.callback_query(AdminCb.filter(F.section == "blocks"), AdminPermissionFilter("users.block"))
@@ -59,7 +69,7 @@ async def admin_blocks(callback: CallbackQuery, session: AsyncSession) -> None:
         if users else "Сейчас никого не заблокировано."
     )
     await callback.message.edit_text(text, reply_markup=admin_back_kb(), parse_mode="HTML")
-    await callback.answer()
+    await _safe_answer(callback)
 
 
 @router.callback_query(AdminCb.filter(F.section == "admins"), AdminPermissionFilter("admins.manage"))
@@ -73,7 +83,7 @@ async def admin_admins(callback: CallbackQuery, session: AsyncSession) -> None:
         if admins else "Администраторов пока нет."
     )
     await callback.message.edit_text(text, reply_markup=admin_back_kb(), parse_mode="HTML")
-    await callback.answer()
+    await _safe_answer(callback)
 
 
 @router.callback_query(AdminCb.filter(F.section == "logs"), AdminPermissionFilter("logs.view"))
@@ -87,7 +97,7 @@ async def admin_logs(callback: CallbackQuery, session: AsyncSession) -> None:
         if logs else "Логов пока нет."
     )
     await callback.message.edit_text(text, reply_markup=admin_back_kb(), parse_mode="HTML")
-    await callback.answer()
+    await _safe_answer(callback)
 
 
 @router.callback_query(AdminCb.filter(F.section == "stats"), AdminPermissionFilter("stats.view"))
@@ -128,4 +138,4 @@ async def admin_stats(callback: CallbackQuery, session: AsyncSession) -> None:
         f"🏁 Завершены: <b>{completed}</b>"
     )
     await callback.message.edit_text(text, reply_markup=admin_back_kb(), parse_mode="HTML")
-    await callback.answer()
+    await _safe_answer(callback)
