@@ -13,8 +13,10 @@ from app.repositories.base import BaseRepository
 
 
 class DealRepository(BaseRepository[Deal]):
+    model = Deal
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(Deal, session)
+        super().__init__(session)
 
     async def get_by_id_with_relations(self, deal_id: int) -> Deal | None:
         stmt = (
@@ -155,8 +157,10 @@ class DealRepository(BaseRepository[Deal]):
 
 
 class DealMessageRepository(BaseRepository[DealMessage]):
+    model = DealMessage
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(DealMessage, session)
+        super().__init__(session)
 
     async def get_deal_messages(
         self,
@@ -209,8 +213,10 @@ class DealMessageRepository(BaseRepository[DealMessage]):
 
 
 class DealDisputeRepository(BaseRepository[DealDispute]):
+    model = DealDispute
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(DealDispute, session)
+        super().__init__(session)
 
     async def get_by_deal_id(self, deal_id: int) -> DealDispute | None:
         stmt = (

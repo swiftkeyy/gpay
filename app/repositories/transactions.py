@@ -12,8 +12,10 @@ from app.repositories.base import BaseRepository
 
 
 class TransactionRepository(BaseRepository[Transaction]):
+    model = Transaction
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(Transaction, session)
+        super().__init__(session)
 
     async def get_user_transactions(
         self,
@@ -122,8 +124,10 @@ class TransactionRepository(BaseRepository[Transaction]):
 
 
 class WithdrawalRepository(BaseRepository[SellerWithdrawal]):
+    model = SellerWithdrawal
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(SellerWithdrawal, session)
+        super().__init__(session)
 
     async def get_seller_withdrawals(
         self,
@@ -194,8 +198,10 @@ class WithdrawalRepository(BaseRepository[SellerWithdrawal]):
 
 
 class NotificationRepository(BaseRepository[Notification]):
+    model = Notification
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(Notification, session)
+        super().__init__(session)
 
     async def get_user_notifications(
         self,

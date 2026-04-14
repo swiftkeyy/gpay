@@ -13,8 +13,10 @@ from app.repositories.base import BaseRepository
 
 
 class SellerRepository(BaseRepository[Seller]):
+    model = Seller
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(Seller, session)
+        super().__init__(session)
 
     async def get_by_user_id(self, user_id: int) -> Seller | None:
         stmt = select(Seller).where(Seller.user_id == user_id).options(selectinload(Seller.user))

@@ -13,8 +13,10 @@ from app.repositories.base import BaseRepository
 
 
 class LotRepository(BaseRepository[Lot]):
+    model = Lot
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(Lot, session)
+        super().__init__(session)
 
     async def get_by_id_with_relations(self, lot_id: int) -> Lot | None:
         stmt = (
@@ -156,8 +158,10 @@ class LotRepository(BaseRepository[Lot]):
 
 
 class LotStockItemRepository(BaseRepository[LotStockItem]):
+    model = LotStockItem
+    
     def __init__(self, session: AsyncSession):
-        super().__init__(LotStockItem, session)
+        super().__init__(session)
 
     async def get_available_item(self, lot_id: int) -> LotStockItem | None:
         """Get first available (not sold, not reserved) stock item"""
