@@ -8,6 +8,7 @@ from app.services.seller import SellerService
 from app.services.lot import LotService
 from app.states.user import SellerStates
 from app.keyboards.user import get_seller_menu_kb, get_seller_lots_kb, get_lot_actions_kb
+from app.models.enums import LotDeliveryType
 
 router = Router(name="seller")
 
@@ -264,14 +265,62 @@ async def add_lot_callback(callback: CallbackQuery, session: AsyncSession, state
         await callback.answer("Ваш магазин еще не активирован. Дождитесь модерации.", show_alert=True)
         return
     
+    # Get list of products to choose from
+    from app.repositories.catalog import ProductRepository
+    product_repo = ProductRepository(session)
+    products = await product_repo.list_active(limit=50)
+    
+    if not products:
+        await callback.answer("В каталоге пока нет товаров", show_alert=True)
+        return
+    
+    # Show products list
+    from aiogram.utils.keyboard import InlineKeyboardBuilder
+    builder = InlineKeyboardBuilder()
+    
+    for product in products[:20]:  # Show first 20
+        builder.button(
+            text=f"{product.title}",
+            callback_data=f"seller:select_product:{product.id}"
+        )
+    
+    builder.adjust(1)
+    builder.button(text="🔙 Назад", callback_data="seller:my_lots")
+    
     await callback.message.edit_text(
         "➕ <b>Добавление нового лота</b>\n\n"
-        "Отправьте название товара:",
-        reply_markup=None
+        "Выберите товар из каталога:",
+        reply_markup=builder.as_markup(),
+        parse_mode="HTML"
+    )
+    await callback.answer()
+
+
+@router.callback_query(F.data.startswith("seller:select_product:"))
+async def select_product_callback(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    """Product selected, ask for lot details"""
+    product_id = int(callback.data.split(":")[2])
+    
+    from app.repositories.catalog import ProductRepository
+    product_repo = ProductRepository(session)
+    product = await product_repo.get_by_id(product_id)
+    
+    if not product:
+        await callback.answer("Товар не найден", show_alert=True)
+        return
+    
+    await state.update_data(product_id=product_id, product_title=product.title)
+    
+    await callback.message.edit_text(
+        f"➕ <b>Добавление лота</b>\n\n"
+        f"Товар: {product.title}\n\n"
+        f"Отправьте название вашего лота\n"
+        f"(например: '{product.title} - быстрая доставка'):",
+        reply_markup=None,
+        parse_mode="HTML"
     )
     
     await state.set_state(SellerStates.waiting_lot_title)
-    await state.update_data(seller_id=seller.id)
     await callback.answer()
 
 
@@ -284,8 +333,15 @@ async def process_lot_title(message: Message, state: FSMContext, session: AsyncS
         await message.answer("Название должно быть не менее 3 символов. Попробуйте еще раз:")
         return
     
+    if len(title) > 255:
+        await message.answer("Название слишком длинное (максимум 255 символов). Попробуйте еще раз:")
+        return
+    
     await state.update_data(title=title)
-    await message.answer("Отправьте описание товара (или /skip чтобы пропустить):")
+    await message.answer(
+        "Отправьте описание товара\n"
+        "(или отправьте /skip чтобы пропустить):"
+    )
     await state.set_state(SellerStates.waiting_lot_description)
 
 
@@ -294,8 +350,12 @@ async def process_lot_description(message: Message, state: FSMContext):
     """Process lot description"""
     description = None if message.text == "/skip" else message.text.strip()
     
+    if description and len(description) > 2000:
+        await message.answer("Описание слишком длинное (максимум 2000 символов). Попробуйте еще раз:")
+        return
+    
     await state.update_data(description=description)
-    await message.answer("Отправьте цену товара (в рублях):")
+    await message.answer("Отправьте цену товара в рублях (например: 100 или 99.99):")
     await state.set_state(SellerStates.waiting_lot_price)
 
 
@@ -304,27 +364,123 @@ async def process_lot_price(message: Message, state: FSMContext, session: AsyncS
     """Process lot price and create lot"""
     try:
         from decimal import Decimal
-        price = Decimal(message.text.strip())
+        price = Decimal(message.text.strip().replace(",", "."))
         if price <= 0:
-            raise ValueError()
+            raise ValueError("Price must be positive")
+        if price > 999999:
+            raise ValueError("Price too high")
     except:
-        await message.answer("Неверная цена. Введите число больше 0:")
+        await message.answer("Неверная цена. Введите число больше 0 (например: 100 или 99.99):")
         return
     
     data = await state.get_data()
-    seller_id = data.get("seller_id")
+    product_id = data.get("product_id")
     title = data.get("title")
     description = data.get("description")
     
-    # Для простоты создаем лот без привязки к продукту
-    # В реальности нужно выбрать продукт из каталога
-    await message.answer(
-        "⚠️ Функция добавления лотов в разработке.\n\n"
-        "Для добавления лотов обратитесь к администратору.",
-        reply_markup=get_seller_menu_kb()
+    # Get seller
+    seller_service = SellerService(session)
+    seller = await seller_service.get_seller_by_user_id(message.from_user.id)
+    
+    if not seller:
+        await message.answer("Ошибка: вы не зарегистрированы как продавец")
+        await state.clear()
+        return
+    
+    # Create lot
+    lot_service = LotService(session)
+    lot = await lot_service.create_lot(
+        seller_id=seller.id,
+        product_id=product_id,
+        title=title,
+        price=price,
+        description=description,
+        delivery_type=LotDeliveryType.MANUAL  # Default to manual
     )
     
+    await session.commit()
     await state.clear()
+    
+    await message.answer(
+        f"✅ <b>Лот создан!</b>\n\n"
+        f"📦 {lot.title}\n"
+        f"💰 Цена: {lot.price} ₽\n"
+        f"📊 Статус: черновик\n\n"
+        f"Лот создан в статусе 'черновик'. "
+        f"Активируйте его через меню 'Мои лоты' когда будете готовы к продажам.",
+        reply_markup=get_seller_menu_kb(),
+        parse_mode="HTML"
+    )
+
+
+@router.callback_query(F.data.startswith("seller:lot_action:add_stock:"))
+async def add_stock_callback(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    """Start adding stock items"""
+    lot_id = int(callback.data.split(":")[3])
+    
+    lot_service = LotService(session)
+    lot = await lot_service.get_lot_with_details(lot_id)
+    
+    if not lot:
+        await callback.answer("Лот не найден", show_alert=True)
+        return
+    
+    await callback.message.edit_text(
+        f"📦 <b>Добавление товаров</b>\n\n"
+        f"Лот: {lot.title}\n\n"
+        f"Отправьте товары для автовыдачи, каждый с новой строки.\n"
+        f"Например:\n"
+        f"<code>код1:пароль1\n"
+        f"код2:пароль2\n"
+        f"код3:пароль3</code>\n\n"
+        f"Или отправьте /cancel для отмены",
+        reply_markup=None,
+        parse_mode="HTML"
+    )
+    
+    await state.set_state(SellerStates.waiting_stock_items)
+    await state.update_data(lot_id=lot_id)
+    await callback.answer()
+
+
+@router.message(SellerStates.waiting_stock_items)
+async def process_stock_items(message: Message, state: FSMContext, session: AsyncSession):
+    """Process stock items"""
+    if message.text == "/cancel":
+        await state.clear()
+        await message.answer("Отменено", reply_markup=get_seller_menu_kb())
+        return
+    
+    data = await state.get_data()
+    lot_id = data.get("lot_id")
+    
+    if not lot_id:
+        await state.clear()
+        return
+    
+    # Parse items (one per line)
+    items_data = [line.strip() for line in message.text.split("\n") if line.strip()]
+    
+    if not items_data:
+        await message.answer("Не найдено ни одного товара. Попробуйте еще раз:")
+        return
+    
+    if len(items_data) > 1000:
+        await message.answer("Слишком много товаров за раз (максимум 1000). Попробуйте еще раз:")
+        return
+    
+    # Add stock items
+    lot_service = LotService(session)
+    added_count = await lot_service.add_stock_items(lot_id, items_data)
+    
+    await session.commit()
+    await state.clear()
+    
+    await message.answer(
+        f"✅ Добавлено товаров: {added_count}\n\n"
+        f"Теперь вы можете активировать лот для продажи.",
+        reply_markup=get_seller_menu_kb()
+    )
 
 
 @router.callback_query(F.data == "seller:stats")
