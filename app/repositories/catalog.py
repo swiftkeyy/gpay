@@ -10,6 +10,9 @@ from app.repositories.base import BaseRepository
 
 class GameRepository(BaseRepository[Game]):
     model = Game
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def list_active(self) -> list[Game]:
         stmt = (
@@ -23,6 +26,9 @@ class GameRepository(BaseRepository[Game]):
 
 class CategoryRepository(BaseRepository[Category]):
     model = Category
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def list_by_game(self, game_id: int) -> list[Category]:
         stmt = (
@@ -40,6 +46,9 @@ class CategoryRepository(BaseRepository[Category]):
 
 class ProductRepository(BaseRepository[Product]):
     model = Product
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def get_full(self, product_id: int) -> Product | None:
         stmt = (
@@ -75,6 +84,9 @@ class ProductRepository(BaseRepository[Product]):
 
 class PriceRepository(BaseRepository[Price]):
     model = Price
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def get_current_for_product(self, product_id: int) -> Price | None:
         from sqlalchemy import func

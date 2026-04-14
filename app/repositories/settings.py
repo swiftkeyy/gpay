@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuditLog, BotSetting, Broadcast, Referral, ReferralReward, Review
 from app.repositories.base import BaseRepository
@@ -8,6 +9,9 @@ from app.repositories.base import BaseRepository
 
 class BotSettingRepository(BaseRepository[BotSetting]):
     model = BotSetting
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def get_by_key(self, key: str) -> BotSetting | None:
         result = await self.session.execute(
@@ -49,6 +53,9 @@ class SettingsRepository(BotSettingRepository):
 
 class BroadcastRepository(BaseRepository[Broadcast]):
     model = Broadcast
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def get_by_id(self, broadcast_id: int) -> Broadcast | None:
         result = await self.session.execute(
@@ -59,15 +66,27 @@ class BroadcastRepository(BaseRepository[Broadcast]):
 
 class ReviewRepository(BaseRepository[Review]):
     model = Review
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
 
 class ReferralRepository(BaseRepository[Referral]):
     model = Referral
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
 
 class ReferralRewardRepository(BaseRepository[ReferralReward]):
     model = ReferralReward
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
 
 class AuditLogRepository(BaseRepository[AuditLog]):
     model = AuditLog
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)

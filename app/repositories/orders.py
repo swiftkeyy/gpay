@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.models import Order, OrderStatusHistory
@@ -9,6 +10,9 @@ from app.repositories.base import BaseRepository
 
 class OrderRepository(BaseRepository[Order]):
     model = Order
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
 
     async def get_full(self, order_id: int) -> Order | None:
         stmt = (
@@ -47,3 +51,6 @@ class OrderRepository(BaseRepository[Order]):
 
 class OrderStatusHistoryRepository(BaseRepository[OrderStatusHistory]):
     model = OrderStatusHistory
+    
+    def __init__(self, session: AsyncSession):
+        super().__init__(session)
