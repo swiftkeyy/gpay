@@ -26,21 +26,34 @@ from app.utils.callbacks import AdminCb
 router = Router(name="admin_catalog")
 settings = get_settings()
 
+TRANSLIT_MAP = {
+    "а": "a", "б": "b", "в": "v", "г": "g", "д": "d", "е": "e", "ё": "e",
+    "ж": "zh", "з": "z", "и": "i", "й": "y", "к": "k", "л": "l", "м": "m",
+    "н": "n", "о": "o", "п": "p", "р": "r", "с": "s", "т": "t", "у": "u",
+    "ф": "f", "х": "h", "ц": "ts", "ч": "ch", "ш": "sh", "щ": "sch",
+    "ъ": "", "ы": "y", "ь": "", "э": "e", "ю": "yu", "я": "ya",
+}
+
 
 def _has_access(user_id: int, admin: Admin | None) -> bool:
     return admin is not None or user_id in {settings.super_admin_tg_id, settings.second_admin_tg_id}
 
 
+def _transliterate(value: str) -> str:
+    return "".join(TRANSLIT_MAP.get(ch, ch) for ch in value.lower())
+
+
 def _slugify(value: str) -> str:
-    value = value.strip().lower()
-    value = value.replace(" ", "-").replace("_", "-")
+    value = _transliterate(value.strip())
+    value = value.replace(" ", "-").replace("_", "-").replace("/", "-")
     value = re.sub(r"[^a-z0-9-]+", "", value)
     value = re.sub(r"-{2,}", "-", value).strip("-")
     return value[:64] or "item"
 
 
 async def _ensure_unique_game_slug(session: AsyncSession, base_slug: str, *, exclude_id: int | None = None) -> str:
-    slug = base_slug or "item"
+    original = base_slug or "item"
+    slug = original
     counter = 1
     while True:
         stmt = select(Game).where(Game.slug == slug)
@@ -50,7 +63,7 @@ async def _ensure_unique_game_slug(session: AsyncSession, base_slug: str, *, exc
         if not exists:
             return slug
         suffix = f"-{counter}"
-        slug = f"{base_slug[: max(1, 64 - len(suffix))]}{suffix}" if base_slug else f"item{suffix}"
+        slug = f"{original[: max(1, 64 - len(suffix))]}{suffix}"
         counter += 1
 
 
@@ -61,7 +74,8 @@ async def _ensure_unique_category_slug(
     base_slug: str,
     exclude_id: int | None = None,
 ) -> str:
-    slug = base_slug or "item"
+    original = base_slug or "item"
+    slug = original
     counter = 1
     while True:
         stmt = select(Category).where(Category.game_id == game_id, Category.slug == slug)
@@ -71,7 +85,7 @@ async def _ensure_unique_category_slug(
         if not exists:
             return slug
         suffix = f"-{counter}"
-        slug = f"{base_slug[: max(1, 64 - len(suffix))]}{suffix}" if base_slug else f"item{suffix}"
+        slug = f"{original[: max(1, 64 - len(suffix))]}{suffix}"
         counter += 1
 
 
@@ -82,7 +96,8 @@ async def _ensure_unique_product_slug(
     base_slug: str,
     exclude_id: int | None = None,
 ) -> str:
-    slug = base_slug or "item"
+    original = base_slug or "item"
+    slug = original
     counter = 1
     while True:
         stmt = select(Product).where(Product.game_id == game_id, Product.slug == slug)
@@ -92,7 +107,7 @@ async def _ensure_unique_product_slug(
         if not exists:
             return slug
         suffix = f"-{counter}"
-        slug = f"{base_slug[: max(1, 64 - len(suffix))]}{suffix}" if base_slug else f"item{suffix}"
+        slug = f"{original[: max(1, 64 - len(suffix))]}{suffix}"
         counter += 1
 
 
@@ -135,21 +150,6 @@ async def admin_games(callback: CallbackQuery, callback_data: AdminCb, session: 
         await callback.answer("Статус игры обновлён.")
         text = f"🎮 <b>{game.title}</b>\n\nID: <code>{game.id}</code>\nSlug: <code>{game.slug}</code>\nАктивна: {'да' if game.is_active else 'нет'}"
         await callback.message.edit_text(text, reply_markup=game_actions_kb(game.id, game.is_active), parse_mode="HTML")
-        return
-    elif callback_data.action == "delete_confirm":
-        from aiogram.utils.keyboard import InlineKeyboardBuilder
-        builder = InlineKeyboardBuilder()
-        builder.button(text="✅ Подтвердить", callback_data=AdminCb(section="games", action="delete_apply", entity_id=game.id).pack())
-        builder.button(text="❌ Отмена", callback_data=AdminCb(section="games", action="view", entity_id=game.id).pack())
-        builder.adjust(1)
-        await callback.message.edit_text(f"Удалить игру <b>{game.title}</b>?\nЭто soft delete.", reply_markup=builder.as_markup(), parse_mode="HTML")
-    elif callback_data.action == "delete_apply":
-        game.is_deleted = True
-        game.is_active = False
-        await session.flush()
-        games = list(await session.scalars(select(Game).where(Game.is_deleted.is_(False)).order_by(Game.sort_order, Game.id)))
-        await callback.message.edit_text("🎮 <b>Игры</b>", reply_markup=games_admin_kb(games), parse_mode="HTML")
-        await callback.answer("Игра удалена.")
         return
     await callback.answer()
 
@@ -241,21 +241,6 @@ async def admin_categories(callback: CallbackQuery, callback_data: AdminCb, sess
         game = await session.get(Game, category.game_id)
         text = f"🗂 <b>{category.title}</b>\n\nID: <code>{category.id}</code>\nИгра: <b>{game.title if game else category.game_id}</b>\nSlug: <code>{category.slug}</code>\nАктивна: {'да' if category.is_active else 'нет'}"
         await callback.message.edit_text(text, reply_markup=category_actions_kb(category.id), parse_mode="HTML")
-        return
-    elif callback_data.action == "delete_confirm":
-        from aiogram.utils.keyboard import InlineKeyboardBuilder
-        builder = InlineKeyboardBuilder()
-        builder.button(text="✅ Подтвердить", callback_data=AdminCb(section="categories", action="delete_apply", entity_id=category.id).pack())
-        builder.button(text="❌ Отмена", callback_data=AdminCb(section="categories", action="view", entity_id=category.id).pack())
-        builder.adjust(1)
-        await callback.message.edit_text(f"Удалить категорию <b>{category.title}</b>?\nЭто soft delete.", reply_markup=builder.as_markup(), parse_mode="HTML")
-    elif callback_data.action == "delete_apply":
-        category.is_deleted = True
-        category.is_active = False
-        await session.flush()
-        categories = list(await session.scalars(select(Category).where(Category.is_deleted.is_(False)).options(joinedload(Category.game)).order_by(Category.sort_order, Category.id)))
-        await callback.message.edit_text("🗂 <b>Категории</b>", reply_markup=categories_admin_kb(categories), parse_mode="HTML")
-        await callback.answer("Категория удалена.")
         return
     await callback.answer()
 
@@ -369,21 +354,6 @@ async def admin_products(callback: CallbackQuery, callback_data: AdminCb, sessio
         await callback.answer("Статус товара обновлён.")
         text = f"🛍 <b>{product.title}</b>\n\nID: <code>{product.id}</code>\nSlug: <code>{product.slug}</code>\nКатегория ID: <code>{product.category_id}</code>\nИгра ID: <code>{product.game_id}</code>\nАктивен: {'да' if product.is_active else 'нет'}"
         await callback.message.edit_text(text, reply_markup=product_actions_kb(product.id), parse_mode="HTML")
-        return
-    elif callback_data.action == "delete_confirm":
-        from aiogram.utils.keyboard import InlineKeyboardBuilder
-        builder = InlineKeyboardBuilder()
-        builder.button(text="✅ Подтвердить", callback_data=AdminCb(section="products", action="delete_apply", entity_id=product.id).pack())
-        builder.button(text="❌ Отмена", callback_data=AdminCb(section="products", action="view", entity_id=product.id).pack())
-        builder.adjust(1)
-        await callback.message.edit_text(f"Удалить товар <b>{product.title}</b>?\nЭто soft delete.", reply_markup=builder.as_markup(), parse_mode="HTML")
-    elif callback_data.action == "delete_apply":
-        product.is_deleted = True
-        product.is_active = False
-        await session.flush()
-        products = list(await session.scalars(select(Product).where(Product.is_deleted.is_(False)).options(joinedload(Product.category), joinedload(Product.game)).order_by(Product.sort_order, Product.id)))
-        await callback.message.edit_text("🛍 <b>Товары</b>", reply_markup=products_admin_kb(products), parse_mode="HTML")
-        await callback.answer("Товар удалён.")
         return
     await callback.answer()
 
