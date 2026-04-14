@@ -1,0 +1,31 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: game_pay
+      POSTGRES_USER: game_pay
+      POSTGRES_PASSWORD: game_pay
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  bot:
+    build: .
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    command: python -m app.main
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
