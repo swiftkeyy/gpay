@@ -56,6 +56,11 @@ async def main() -> None:
     dp.include_router(profile.router)
     dp.include_router(support.router)
     dp.include_router(reviews.router)
+    
+    # Import and include new routers
+    from app.handlers.user import seller, deals
+    dp.include_router(seller.router)
+    dp.include_router(deals.router)
 
     dp.include_router(panel.router)
     dp.include_router(admin_catalog.router)

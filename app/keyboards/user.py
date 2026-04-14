@@ -181,3 +181,153 @@ def back_home_kb() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="🔙 В меню", callback_data=NavCb(target="home").pack())
     return builder.as_markup()
+
+
+
+def get_seller_menu_kb() -> InlineKeyboardMarkup:
+    """Seller menu keyboard"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="📦 Мои лоты", callback_data="seller:my_lots")
+    builder.button(text="➕ Добавить лот", callback_data="seller:add_lot")
+    builder.button(text="💰 Баланс", callback_data="seller:balance")
+    builder.button(text="💸 Вывести средства", callback_data="seller:withdraw")
+    builder.button(text="📊 Статистика", callback_data="seller:stats")
+    builder.button(text="💼 Мои продажи", callback_data="seller:sales")
+    builder.button(text="🔙 В меню", callback_data=NavCb(target="home").pack())
+    builder.adjust(2, 2, 2, 1)
+    return builder.as_markup()
+
+
+def get_seller_lots_kb(lots: list) -> InlineKeyboardMarkup:
+    """Seller lots list keyboard"""
+    builder = InlineKeyboardBuilder()
+    
+    for lot in lots:
+        status_emoji = {
+            "draft": "📝",
+            "active": "✅",
+            "paused": "⏸",
+            "out_of_stock": "❌"
+        }
+        emoji = status_emoji.get(lot.status.value, "📦")
+        builder.button(
+            text=f"{emoji} {lot.title} - {lot.price} ₽",
+            callback_data=f"seller:lot:{lot.id}"
+        )
+    
+    builder.adjust(1)
+    builder.button(text="➕ Добавить лот", callback_data="seller:add_lot")
+    builder.button(text="🔙 Назад", callback_data="seller:my_lots")
+    builder.adjust(1, 1)
+    return builder.as_markup()
+
+
+def get_lot_actions_kb(lot_id: int, status: str) -> InlineKeyboardMarkup:
+    """Lot actions keyboard"""
+    builder = InlineKeyboardBuilder()
+    
+    if status == "draft":
+        builder.button(text="✅ Активировать", callback_data=f"seller:lot_action:activate:{lot_id}")
+    elif status == "active":
+        builder.button(text="⏸ Приостановить", callback_data=f"seller:lot_action:pause:{lot_id}")
+    elif status == "paused":
+        builder.button(text="✅ Активировать", callback_data=f"seller:lot_action:activate:{lot_id}")
+    
+    builder.button(text="✏️ Редактировать", callback_data=f"seller:lot_action:edit:{lot_id}")
+    builder.button(text="📦 Добавить товар", callback_data=f"seller:lot_action:add_stock:{lot_id}")
+    builder.button(text="🗑 Удалить", callback_data=f"seller:lot_action:delete:{lot_id}")
+    builder.button(text="🔙 К лотам", callback_data="seller:my_lots")
+    
+    builder.adjust(2, 2, 1, 1)
+    return builder.as_markup()
+
+
+def get_deals_list_kb(buyer_deals: list, seller_deals: list) -> InlineKeyboardMarkup:
+    """Deals list keyboard"""
+    builder = InlineKeyboardBuilder()
+    
+    if buyer_deals:
+        builder.button(text="🛒 Мои покупки", callback_data="deals:buyer")
+    
+    if seller_deals:
+        builder.button(text="💼 Мои продажи", callback_data="deals:seller")
+    
+    # Show first few deals
+    for deal in (buyer_deals + seller_deals)[:10]:
+        status_emoji = {
+            "created": "🆕",
+            "paid": "💳",
+            "in_progress": "⏳",
+            "waiting_confirmation": "⏰",
+            "completed": "✅",
+            "canceled": "❌",
+            "dispute": "⚠️"
+        }
+        emoji = status_emoji.get(deal.status.value, "📦")
+        builder.button(
+            text=f"{emoji} Заказ #{deal.order_id}",
+            callback_data=f"deal:{deal.id}"
+        )
+    
+    builder.adjust(2)
+    builder.button(text="🔙 В меню", callback_data=NavCb(target="home").pack())
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_deal_kb(deal_id: int, status: str, is_buyer: bool) -> InlineKeyboardMarkup:
+    """Deal actions keyboard"""
+    builder = InlineKeyboardBuilder()
+    
+    builder.button(text="💬 Чат", callback_data=f"deal_chat:{deal_id}")
+    
+    if is_buyer and status == "waiting_confirmation":
+        builder.button(text="✅ Подтвердить получение", callback_data=f"deal_confirm:{deal_id}")
+        builder.button(text="⚠️ Открыть спор", callback_data=f"deal_dispute:{deal_id}")
+    
+    if not is_buyer and status == "in_progress":
+        builder.button(text="📦 Доставить товар", callback_data=f"deal_deliver:{deal_id}")
+    
+    if status in ["created", "paid", "in_progress", "waiting_confirmation"]:
+        builder.button(text="❌ Отменить", callback_data=f"deal_cancel:{deal_id}")
+    
+    builder.button(text="🔙 К сделкам", callback_data="deals:list")
+    
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_deal_chat_kb(deal_id: int) -> InlineKeyboardMarkup:
+    """Deal chat keyboard"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🔙 К сделке", callback_data=f"deal:{deal_id}")
+    return builder.as_markup()
+
+
+def get_lots_by_product_kb(product_id: int, lots: list) -> InlineKeyboardMarkup:
+    """Lots selection keyboard for product"""
+    builder = InlineKeyboardBuilder()
+    
+    for lot in lots:
+        seller_name = lot.seller.shop_name if hasattr(lot, 'seller') else "Продавец"
+        rating = f"{float(lot.seller.rating):.1f}⭐" if hasattr(lot, 'seller') else ""
+        builder.button(
+            text=f"{seller_name} - {lot.price} ₽ {rating}",
+            callback_data=f"lot:buy:{lot.id}"
+        )
+    
+    builder.adjust(1)
+    builder.button(text="🔙 Назад", callback_data=f"prod:{product_id}")
+    builder.adjust(1)
+    return builder.as_markup()
+
+
+def get_lot_detail_kb(lot_id: int, seller_id: int) -> InlineKeyboardMarkup:
+    """Lot detail keyboard"""
+    builder = InlineKeyboardBuilder()
+    builder.button(text="🛒 Купить", callback_data=f"lot:purchase:{lot_id}")
+    builder.button(text="⭐ Продавец", callback_data=f"seller:view:{seller_id}")
+    builder.button(text="❤️ В избранное", callback_data=f"lot:favorite:{lot_id}")
+    builder.button(text="🔙 Назад", callback_data="lots:list")
+    builder.adjust(1, 2, 1)
+    return builder.as_markup()

@@ -99,3 +99,78 @@ class BlockActionScope(StrEnum):
     PROMO_CODES = "promo_codes"
     REFERRALS = "referrals"
     FULL = "full"
+
+
+class SellerStatus(StrEnum):
+    PENDING = "pending"
+    ACTIVE = "active"
+    SUSPENDED = "suspended"
+    BANNED = "banned"
+
+
+class LotStatus(StrEnum):
+    DRAFT = "draft"
+    ACTIVE = "active"
+    PAUSED = "paused"
+    OUT_OF_STOCK = "out_of_stock"
+    DELETED = "deleted"
+
+
+class LotDeliveryType(StrEnum):
+    AUTO = "auto"
+    MANUAL = "manual"
+    COORDINATES = "coordinates"
+
+
+class DealStatus(StrEnum):
+    CREATED = "created"
+    PAID = "paid"
+    IN_PROGRESS = "in_progress"
+    WAITING_CONFIRMATION = "waiting_confirmation"
+    COMPLETED = "completed"
+    CANCELED = "canceled"
+    DISPUTE = "dispute"
+    REFUNDED = "refunded"
+
+
+class TransactionType(StrEnum):
+    DEPOSIT = "deposit"
+    PURCHASE = "purchase"
+    SALE = "sale"
+    REFUND = "refund"
+    WITHDRAWAL = "withdrawal"
+    COMMISSION = "commission"
+    BONUS = "bonus"
+    PENALTY = "penalty"
+
+
+class TransactionStatus(StrEnum):
+    PENDING = "pending"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
+class WithdrawalStatus(StrEnum):
+    PENDING = "pending"
+    PROCESSING = "processing"
+    COMPLETED = "completed"
+    REJECTED = "rejected"
+    CANCELED = "canceled"
+
+
+class DisputeStatus(StrEnum):
+    OPEN = "open"
+    IN_REVIEW = "in_review"
+    RESOLVED = "resolved"
+    CLOSED = "closed"
+
+
+class NotificationType(StrEnum):
+    NEW_MESSAGE = "new_message"
+    NEW_ORDER = "new_order"
+    ORDER_STATUS = "order_status"
+    PAYMENT = "payment"
+    REVIEW = "review"
+    SYSTEM = "system"
+    PRICE_ALERT = "price_alert"

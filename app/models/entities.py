@@ -29,15 +29,24 @@ from app.models.enums import (
     AuditAction,
     BlockActionScope,
     BroadcastStatus,
+    DealStatus,
     DiscountScope,
+    DisputeStatus,
     EntityType,
     FulfillmentType,
+    LotDeliveryType,
+    LotStatus,
     MediaType,
+    NotificationType,
     OrderStatus,
     PaymentProviderType,
     PromoType,
     ReferralRewardType,
     ReviewStatus,
+    SellerStatus,
+    TransactionStatus,
+    TransactionType,
+    WithdrawalStatus,
 )
 
 
@@ -207,6 +216,7 @@ class User(Base, TimestampMixin):
     referred_by_user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     personal_discount_percent: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=sa_text("0"))
     referral_code: Mapped[str | None] = mapped_column(String(32), unique=True, nullable=True)
+    balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default=sa_text("0.00"))
 
     referred_by: Mapped["User | None"] = relationship(remote_side=[id], uselist=False)
 
@@ -493,3 +503,288 @@ class UserBlock(Base, TimestampMixin):
     )
     reason: Mapped[str | None] = mapped_column(Text, nullable=True)
     expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+
+class Seller(Base, TimestampMixin):
+    __tablename__ = "sellers"
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_sellers_user_id"),
+        Index("ix_sellers_status_rating", "status", "rating"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[SellerStatus] = mapped_column(
+        SAEnum(SellerStatus, name="seller_status_enum", values_callable=enum_values),
+        nullable=False,
+        default=SellerStatus.PENDING,
+        server_default=sa_text("'pending'"),
+    )
+    shop_name: Mapped[str] = mapped_column(String(120), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    rating: Mapped[Decimal] = mapped_column(Numeric(3, 2), nullable=False, default=Decimal("0.00"), server_default=sa_text("0.00"))
+    total_sales: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=sa_text("0"))
+    total_reviews: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=sa_text("0"))
+    balance: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default=sa_text("0.00"))
+    commission_percent: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("10.00"), server_default=sa_text("10.00"))
+    is_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship()
+    lots: Mapped[list["Lot"]] = relationship(back_populates="seller")
+
+
+class Lot(Base, TimestampMixin, SoftDeleteMixin):
+    __tablename__ = "lots"
+    __table_args__ = (
+        Index("ix_lots_product_seller_status", "product_id", "seller_id", "status"),
+        Index("ix_lots_status_price", "status", "price"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("sellers.id", ondelete="CASCADE"), nullable=False)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    price: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency_code: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB", server_default=sa_text("'RUB'"))
+    delivery_type: Mapped[LotDeliveryType] = mapped_column(
+        SAEnum(LotDeliveryType, name="lot_delivery_type_enum", values_callable=enum_values),
+        nullable=False,
+        default=LotDeliveryType.MANUAL,
+        server_default=sa_text("'manual'"),
+    )
+    stock_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=sa_text("0"))
+    reserved_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=sa_text("0"))
+    sold_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=sa_text("0"))
+    status: Mapped[LotStatus] = mapped_column(
+        SAEnum(LotStatus, name="lot_status_enum", values_callable=enum_values),
+        nullable=False,
+        default=LotStatus.DRAFT,
+        server_default=sa_text("'draft'"),
+    )
+    auto_delivery_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default=sa_text("'{}'::jsonb"))
+    delivery_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+
+    seller: Mapped["Seller"] = relationship(back_populates="lots")
+    product: Mapped["Product"] = relationship()
+    stock_items: Mapped[list["LotStockItem"]] = relationship(back_populates="lot", cascade="all, delete-orphan")
+
+
+class LotStockItem(Base, TimestampMixin):
+    __tablename__ = "lot_stock_items"
+    __table_args__ = (
+        Index("ix_lot_stock_items_lot_status", "lot_id", "is_sold", "is_reserved"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lot_id: Mapped[int] = mapped_column(ForeignKey("lots.id", ondelete="CASCADE"), nullable=False)
+    data: Mapped[str] = mapped_column(Text, nullable=False)
+    is_sold: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    is_reserved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    reserved_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sold_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deal_id: Mapped[int | None] = mapped_column(ForeignKey("deals.id", ondelete="SET NULL"), nullable=True)
+
+    lot: Mapped["Lot"] = relationship(back_populates="stock_items")
+
+
+class Deal(Base, TimestampMixin):
+    __tablename__ = "deals"
+    __table_args__ = (
+        UniqueConstraint("order_id", name="uq_deals_order_id"),
+        Index("ix_deals_buyer_status", "buyer_id", "status"),
+        Index("ix_deals_seller_status", "seller_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    buyer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("sellers.id", ondelete="CASCADE"), nullable=False)
+    lot_id: Mapped[int] = mapped_column(ForeignKey("lots.id", ondelete="CASCADE"), nullable=False)
+    status: Mapped[DealStatus] = mapped_column(
+        SAEnum(DealStatus, name="deal_status_enum", values_callable=enum_values),
+        nullable=False,
+        default=DealStatus.CREATED,
+        server_default=sa_text("'created'"),
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    commission_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    seller_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    escrow_released: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    escrow_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    auto_complete_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    buyer_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    buyer_confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    order: Mapped["Order"] = relationship()
+    buyer: Mapped["User"] = relationship(foreign_keys=[buyer_id])
+    seller: Mapped["Seller"] = relationship()
+    lot: Mapped["Lot"] = relationship()
+    messages: Mapped[list["DealMessage"]] = relationship(back_populates="deal", cascade="all, delete-orphan")
+
+
+class DealMessage(Base):
+    __tablename__ = "deal_messages"
+    __table_args__ = (
+        Index("ix_deal_messages_deal_created", "deal_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    message_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    media_id: Mapped[int | None] = mapped_column(ForeignKey("media_files.id", ondelete="SET NULL"), nullable=True)
+    is_system: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    deal: Mapped["Deal"] = relationship(back_populates="messages")
+    sender: Mapped["User"] = relationship()
+
+
+class DealDispute(Base, TimestampMixin):
+    __tablename__ = "deal_disputes"
+    __table_args__ = (
+        UniqueConstraint("deal_id", name="uq_deal_disputes_deal_id"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
+    initiator_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[DisputeStatus] = mapped_column(
+        SAEnum(DisputeStatus, name="dispute_status_enum", values_callable=enum_values),
+        nullable=False,
+        default=DisputeStatus.OPEN,
+        server_default=sa_text("'open'"),
+    )
+    admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Transaction(Base):
+    __tablename__ = "transactions"
+    __table_args__ = (
+        Index("ix_transactions_user_type_created", "user_id", "transaction_type", "created_at"),
+        Index("ix_transactions_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    transaction_type: Mapped[TransactionType] = mapped_column(
+        SAEnum(TransactionType, name="transaction_type_enum", values_callable=enum_values),
+        nullable=False,
+    )
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency_code: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB", server_default=sa_text("'RUB'"))
+    status: Mapped[TransactionStatus] = mapped_column(
+        SAEnum(TransactionStatus, name="transaction_status_enum", values_callable=enum_values),
+        nullable=False,
+        default=TransactionStatus.PENDING,
+        server_default=sa_text("'pending'"),
+    )
+    balance_before: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    balance_after: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    reference_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default=sa_text("'{}'::jsonb"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped["User"] = relationship()
+
+
+class SellerWithdrawal(Base, TimestampMixin):
+    __tablename__ = "seller_withdrawals"
+    __table_args__ = (
+        Index("ix_seller_withdrawals_seller_status", "seller_id", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("sellers.id", ondelete="CASCADE"), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    currency_code: Mapped[str] = mapped_column(String(10), nullable=False, default="RUB", server_default=sa_text("'RUB'"))
+    status: Mapped[WithdrawalStatus] = mapped_column(
+        SAEnum(WithdrawalStatus, name="withdrawal_status_enum", values_callable=enum_values),
+        nullable=False,
+        default=WithdrawalStatus.PENDING,
+        server_default=sa_text("'pending'"),
+    )
+    payment_method: Mapped[str] = mapped_column(String(50), nullable=False)
+    payment_details: Mapped[str] = mapped_column(Text, nullable=False)
+    processed_by_admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    seller: Mapped["Seller"] = relationship()
+
+
+class SellerReview(Base, TimestampMixin):
+    __tablename__ = "seller_reviews"
+    __table_args__ = (
+        Index("ix_seller_reviews_seller_status", "seller_id", "status"),
+        CheckConstraint("rating >= 1 AND rating <= 5", name="ck_seller_reviews_rating_range"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    seller_id: Mapped[int] = mapped_column(ForeignKey("sellers.id", ondelete="CASCADE"), nullable=False)
+    deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
+    buyer_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)
+    text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    status: Mapped[ReviewStatus] = mapped_column(
+        SAEnum(ReviewStatus, name="seller_review_status_enum", values_callable=enum_values),
+        nullable=False,
+        default=ReviewStatus.PUBLISHED,
+        server_default=sa_text("'published'"),
+    )
+    seller_reply: Mapped[str | None] = mapped_column(Text, nullable=True)
+    seller_replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    seller: Mapped["Seller"] = relationship()
+    buyer: Mapped["User"] = relationship()
+
+
+class Favorite(Base):
+    __tablename__ = "favorites"
+    __table_args__ = (
+        UniqueConstraint("user_id", "lot_id", name="uq_favorites_user_lot"),
+        Index("ix_favorites_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    lot_id: Mapped[int] = mapped_column(ForeignKey("lots.id", ondelete="CASCADE"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped["User"] = relationship()
+    lot: Mapped["Lot"] = relationship()
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+    __table_args__ = (
+        Index("ix_notifications_user_read_created", "user_id", "is_read", "created_at"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    notification_type: Mapped[NotificationType] = mapped_column(
+        SAEnum(NotificationType, name="notification_type_enum", values_callable=enum_values),
+        nullable=False,
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    reference_type: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    reference_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    user: Mapped["User"] = relationship()
