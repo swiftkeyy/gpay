@@ -50,6 +50,7 @@ class UserContextMiddleware(BaseMiddleware):
             )
             session.add(db_user)
             await session.flush()
+            await session.commit()  # Commit to save user
         else:
             changed = False
             if db_user.username != tg_user.username:
