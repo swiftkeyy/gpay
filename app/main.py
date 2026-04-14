@@ -375,7 +375,7 @@ async def main() -> None:
     dp.include_router(admin_misc.router)
     dp.include_router(admin_reviews.router)
 
-    await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
+    await dp.start_polling(bot, allowed_updates=["message", "callback_query", "inline_query", "chosen_inline_result"])
 
 
 if __name__ == "__main__":

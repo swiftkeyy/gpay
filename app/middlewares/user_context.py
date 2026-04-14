@@ -28,10 +28,14 @@ class UserContextMiddleware(BaseMiddleware):
         elif isinstance(event, CallbackQuery):
             tg_user = event.from_user
         else:
+            # For other event types, try to get from_user
             tg_user = getattr(event, "from_user", None)
 
+        # If no tg_user, just pass through without setting db_user
         if session is None or tg_user is None:
-            logger.warning(f"No session or tg_user: session={session is not None}, tg_user={tg_user is not None}")
+            if tg_user is None:
+                # Don't log warning for events that naturally don't have from_user
+                pass
             data["db_user"] = None
             data["admin"] = None
             return await handler(event, data)
