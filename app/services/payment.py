@@ -103,6 +103,7 @@ class CryptoBotClient:
         headers = {
             "Crypto-Pay-API-Token": self.token,
             "Content-Type": "application/json",
+            "Accept": "application/json",
         }
         data = json.dumps(payload).encode("utf-8")
         request = Request(
@@ -118,17 +119,25 @@ class CryptoBotClient:
                     body = response.read().decode("utf-8")
             except HTTPError as exc:
                 body = exc.read().decode("utf-8", errors="ignore")
-                raise PaymentError(f"Crypto Bot HTTP {exc.code}: {body}") from exc
+                error_msg = f"CryptoBot HTTP {exc.code}"
+                try:
+                    error_data = json.loads(body)
+                    if error_data.get("error"):
+                        error_msg += f": {error_data['error']}"
+                except:
+                    error_msg += f": {body[:200]}"
+                raise PaymentError(error_msg) from exc
             except URLError as exc:
-                raise PaymentError(f"Crypto Bot недоступен: {exc.reason}") from exc
+                raise PaymentError(f"CryptoBot недоступен: {exc.reason}") from exc
 
             try:
                 parsed = json.loads(body)
             except json.JSONDecodeError as exc:
-                raise PaymentError("Crypto Bot вернул невалидный JSON") from exc
+                raise PaymentError(f"CryptoBot вернул невалидный JSON: {body[:200]}") from exc
 
             if not parsed.get("ok"):
-                raise PaymentError(parsed.get("error") or "Crypto Bot вернул ошибку")
+                error = parsed.get("error") or parsed.get("message") or "Неизвестная ошибка"
+                raise PaymentError(f"CryptoBot: {error}")
             return parsed.get("result") or {}
 
         return await asyncio.to_thread(_do_request)

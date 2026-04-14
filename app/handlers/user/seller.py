@@ -248,3 +248,160 @@ async def seller_withdraw_callback(callback: CallbackQuery, session: AsyncSessio
         storage=callback.bot.get("storage"),
         key=callback.from_user.id
     ).set_state(SellerStates.waiting_withdrawal_amount)
+
+
+@router.callback_query(F.data == "seller:add_lot")
+async def add_lot_callback(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    """Start adding new lot"""
+    seller_service = SellerService(session)
+    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    
+    if not seller:
+        await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
+        return
+    
+    if seller.status.value != "active":
+        await callback.answer("Ваш магазин еще не активирован. Дождитесь модерации.", show_alert=True)
+        return
+    
+    await callback.message.edit_text(
+        "➕ <b>Добавление нового лота</b>\n\n"
+        "Отправьте название товара:",
+        reply_markup=None
+    )
+    
+    await state.set_state(SellerStates.waiting_lot_title)
+    await state.update_data(seller_id=seller.id)
+    await callback.answer()
+
+
+@router.message(SellerStates.waiting_lot_title)
+async def process_lot_title(message: Message, state: FSMContext, session: AsyncSession):
+    """Process lot title"""
+    title = message.text.strip()
+    
+    if len(title) < 3:
+        await message.answer("Название должно быть не менее 3 символов. Попробуйте еще раз:")
+        return
+    
+    await state.update_data(title=title)
+    await message.answer("Отправьте описание товара (или /skip чтобы пропустить):")
+    await state.set_state(SellerStates.waiting_lot_description)
+
+
+@router.message(SellerStates.waiting_lot_description)
+async def process_lot_description(message: Message, state: FSMContext):
+    """Process lot description"""
+    description = None if message.text == "/skip" else message.text.strip()
+    
+    await state.update_data(description=description)
+    await message.answer("Отправьте цену товара (в рублях):")
+    await state.set_state(SellerStates.waiting_lot_price)
+
+
+@router.message(SellerStates.waiting_lot_price)
+async def process_lot_price(message: Message, state: FSMContext, session: AsyncSession):
+    """Process lot price and create lot"""
+    try:
+        from decimal import Decimal
+        price = Decimal(message.text.strip())
+        if price <= 0:
+            raise ValueError()
+    except:
+        await message.answer("Неверная цена. Введите число больше 0:")
+        return
+    
+    data = await state.get_data()
+    seller_id = data.get("seller_id")
+    title = data.get("title")
+    description = data.get("description")
+    
+    # Для простоты создаем лот без привязки к продукту
+    # В реальности нужно выбрать продукт из каталога
+    await message.answer(
+        "⚠️ Функция добавления лотов в разработке.\n\n"
+        "Для добавления лотов обратитесь к администратору.",
+        reply_markup=get_seller_menu_kb()
+    )
+    
+    await state.clear()
+
+
+@router.callback_query(F.data == "seller:stats")
+async def seller_stats_callback(callback: CallbackQuery, session: AsyncSession):
+    """Show seller statistics"""
+    seller_service = SellerService(session)
+    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    
+    if not seller:
+        await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
+        return
+    
+    stats = await seller_service.get_seller_stats(seller.id)
+    
+    text = (
+        f"📊 <b>Статистика магазина</b>\n\n"
+        f"🏪 {seller.shop_name}\n"
+        f"⭐ Рейтинг: {stats['rating']:.2f} ({stats['total_reviews']} отзывов)\n"
+        f"💰 Баланс: {stats['balance']:.2f} ₽\n"
+        f"📦 Всего продаж: {stats['total_sales']}\n"
+        f"📊 Статус: {stats['status']}\n"
+    )
+    
+    if stats['is_verified']:
+        text += "✅ Верифицирован\n"
+    
+    # Добавим статистику по лотам
+    lot_service = LotService(session)
+    lots = await lot_service.get_seller_lots(seller.id)
+    
+    active_lots = sum(1 for lot in lots if lot.status.value == "active")
+    total_stock = sum(lot.stock_count for lot in lots)
+    
+    text += f"\n📦 Активных лотов: {active_lots}\n"
+    text += f"📦 Товаров в наличии: {total_stock}\n"
+    
+    await callback.message.edit_text(text, reply_markup=get_seller_menu_kb(), parse_mode="HTML")
+    await callback.answer()
+
+
+@router.callback_query(F.data == "seller:sales")
+async def seller_sales_callback(callback: CallbackQuery, session: AsyncSession):
+    """Show seller sales"""
+    seller_service = SellerService(session)
+    seller = await seller_service.get_seller_by_user_id(callback.from_user.id)
+    
+    if not seller:
+        await callback.answer("Вы не зарегистрированы как продавец", show_alert=True)
+        return
+    
+    # Получаем сделки продавца
+    from app.repositories.deals import DealRepository
+    deal_repo = DealRepository(session)
+    deals = await deal_repo.get_seller_deals(seller.id, limit=10)
+    
+    if not deals:
+        await callback.message.edit_text(
+            "💼 У вас пока нет продаж",
+            reply_markup=get_seller_menu_kb()
+        )
+        await callback.answer()
+        return
+    
+    text = "💼 <b>Ваши продажи</b>\n\n"
+    
+    for deal in deals:
+        status_emoji = {
+            "created": "🆕",
+            "paid": "💳",
+            "in_progress": "⏳",
+            "waiting_confirmation": "⏰",
+            "completed": "✅",
+            "canceled": "❌",
+            "dispute": "⚠️"
+        }
+        emoji = status_emoji.get(deal.status.value, "📦")
+        text += f"{emoji} Заказ #{deal.order_id} - {deal.amount} ₽ ({deal.status.value})\n"
+    
+    await callback.message.edit_text(text, reply_markup=get_seller_menu_kb(), parse_mode="HTML")
+    await callback.answer()

@@ -98,3 +98,19 @@ async def home_callback(
 ) -> None:
     await state.clear()
     await _render_home(callback, session, db_user, admin)
+
+
+@router.callback_query(NavCb.filter(F.target == "seller"))
+async def seller_redirect(callback: CallbackQuery) -> None:
+    """Redirect to seller menu"""
+    from app.handlers.user.seller import seller_menu_cmd
+    # Simulate command by creating a message-like object
+    await callback.message.answer("Используйте команду /seller для управления магазином")
+    await callback.answer()
+
+
+@router.callback_query(NavCb.filter(F.target == "deals"))
+async def deals_redirect(callback: CallbackQuery) -> None:
+    """Redirect to deals menu"""
+    await callback.message.answer("Используйте команду /deals для просмотра сделок")
+    await callback.answer()

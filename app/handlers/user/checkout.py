@@ -142,10 +142,10 @@ async def checkout_from_cart(
         order_number=_order_number(),
         user_id=db_user.id,
         status=OrderStatus.NEW,
-        subtotal_amount=totals["subtotal"],
-        discount_amount=totals["discount"],
-        total_amount=totals["total"],
-        currency_code=totals["currency_code"],
+        subtotal_amount=Decimal(str(totals["subtotal"])),
+        discount_amount=Decimal(str(totals["discount"])),
+        total_amount=Decimal(str(totals["total"])),
+        currency_code=str(totals["currency_code"]),
         payment_provider=PaymentProviderType.MANUAL,
         payment_external_id=None,
         fulfillment_type=cart.items[0].product.fulfillment_type if cart.items and cart.items[0].product else "manual",
@@ -229,6 +229,10 @@ async def choose_manual_payment(
         await _safe_callback_answer(callback, "Заказ не найден", show_alert=True)
         return
 
+    # Фиксируем сумму - не даем ей измениться
+    fixed_total = Decimal(str(order.total_amount))
+    fixed_currency = str(order.currency_code)
+    
     order.status = OrderStatus.WAITING_PAYMENT
     order.payment_provider = PaymentProviderType.MANUAL
     await session.commit()
@@ -236,7 +240,7 @@ async def choose_manual_payment(
     text = (
         f"💬 <b>Ручная оплата</b>\n\n"
         f"Заказ: <code>{order.order_number}</code>\n"
-        f"Сумма: <b>{order.total_amount} {order.currency_code}</b>\n\n"
+        f"Сумма: <b>{fixed_total} {fixed_currency}</b>\n\n"
         f"Свяжитесь с поддержкой или оплатите по инструкции магазина."
     )
 

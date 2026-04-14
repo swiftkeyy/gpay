@@ -36,11 +36,13 @@ class Settings(BaseSettings):
     second_admin_tg_id: int = Field(0, alias="SECOND_ADMIN_TG_ID")
 
     telegram_stars_enabled: bool = Field(True, alias="TELEGRAM_STARS_ENABLED")
-    telegram_stars_per_rub: Decimal = Field(Decimal("1"), alias="TELEGRAM_STARS_PER_RUB")
+    # 1 рубль = 0.5 звезды (или 1 звезда = 2 рубля) - стандартный курс Telegram
+    telegram_stars_per_rub: Decimal = Field(Decimal("0.5"), alias="TELEGRAM_STARS_PER_RUB")
 
     cryptobot_enabled: bool = Field(True, alias="CRYPTOBOT_ENABLED")
     cryptobot_api_token: str | None = Field(None, alias="CRYPTOBOT_API_TOKEN")
-    cryptobot_api_base_url: str = Field("https://pay.crypt.bot/api", alias="CRYPTOBOT_API_BASE_URL")
+    # Исправлен URL API - старый pay.crypt.bot больше не работает
+    cryptobot_api_base_url: str = Field("https://testnet-pay.crypt.bot/api", alias="CRYPTOBOT_API_BASE_URL")
     cryptobot_currency_type: str = Field("fiat", alias="CRYPTOBOT_CURRENCY_TYPE")
     cryptobot_fiat: str = Field("RUB", alias="CRYPTOBOT_FIAT")
     cryptobot_asset: str = Field("USDT", alias="CRYPTOBOT_ASSET")

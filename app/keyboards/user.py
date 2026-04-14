@@ -17,6 +17,8 @@ def main_menu_kb(*, is_admin: bool = False) -> InlineKeyboardMarkup:
     builder.button(text="🛒 Корзина", callback_data=NavCb(target="cart").pack())
     builder.button(text="📦 Мои заказы", callback_data=NavCb(target="orders_current").pack())
     builder.button(text="🕘 История заказов", callback_data=NavCb(target="orders_history").pack())
+    builder.button(text="🏪 Продавать", callback_data=NavCb(target="seller").pack())
+    builder.button(text="💼 Мои сделки", callback_data=NavCb(target="deals").pack())
     builder.button(text="🎁 Промокод", callback_data=NavCb(target="promo").pack())
     builder.button(text="⭐ Отзывы", callback_data=NavCb(target="reviews").pack())
     builder.button(text="👤 Профиль", callback_data=NavCb(target="profile").pack())
@@ -26,9 +28,9 @@ def main_menu_kb(*, is_admin: bool = False) -> InlineKeyboardMarkup:
 
     if is_admin:
         builder.button(text="👮 Админка", callback_data=NavCb(target="admin_panel").pack())
-        builder.adjust(2, 2, 2, 2, 1, 1, 1)
+        builder.adjust(2, 2, 2, 2, 2, 1, 1, 1)
     else:
-        builder.adjust(2, 2, 2, 2, 1, 1)
+        builder.adjust(2, 2, 2, 2, 2, 1, 1)
     return builder.as_markup()
 
 
