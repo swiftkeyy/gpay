@@ -18,6 +18,10 @@ router = Router(name="user_profile")
 
 @router.callback_query(NavCb.filter(F.target == "profile"))
 async def profile_view(callback: CallbackQuery, session: AsyncSession, db_user: User | None = None) -> None:
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.info(f"profile_view called: db_user={db_user}, db_user.id={db_user.id if db_user else 'None'}")
+    
     if db_user is None:
         await callback.answer("Ошибка: пользователь не найден", show_alert=True)
         return
