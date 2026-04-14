@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable
 from typing import Any
 
@@ -8,6 +9,8 @@ from aiogram.types import CallbackQuery, Message, TelegramObject
 from sqlalchemy import select
 
 from app.models import Admin, User
+
+logger = logging.getLogger(__name__)
 
 
 class UserContextMiddleware(BaseMiddleware):
@@ -28,6 +31,7 @@ class UserContextMiddleware(BaseMiddleware):
             tg_user = getattr(event, "from_user", None)
 
         if session is None or tg_user is None:
+            logger.warning(f"No session or tg_user: session={session is not None}, tg_user={tg_user is not None}")
             data["db_user"] = None
             data["admin"] = None
             return await handler(event, data)
@@ -38,6 +42,7 @@ class UserContextMiddleware(BaseMiddleware):
         db_user = result.scalar_one_or_none()
 
         if db_user is None:
+            logger.info(f"Creating new user: telegram_id={tg_user.id}, username={tg_user.username}")
             db_user = User(
                 telegram_id=tg_user.id,
                 username=tg_user.username,
@@ -50,8 +55,10 @@ class UserContextMiddleware(BaseMiddleware):
             )
             session.add(db_user)
             await session.flush()
-            await session.refresh(db_user)  # Refresh to get id
+            await session.refresh(db_user)
+            logger.info(f"User created: id={db_user.id}, telegram_id={db_user.telegram_id}")
         else:
+            logger.debug(f"User found: id={db_user.id}, telegram_id={db_user.telegram_id}")
             changed = False
             if db_user.username != tg_user.username:
                 db_user.username = tg_user.username
@@ -66,6 +73,7 @@ class UserContextMiddleware(BaseMiddleware):
                 await session.flush()
 
         data["db_user"] = db_user
+        logger.debug(f"Setting db_user in data: id={db_user.id if db_user else None}")
 
         admin_result = await session.execute(
             select(Admin).where(
