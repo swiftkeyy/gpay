@@ -1,79 +1,70 @@
 """
-Скрипт для проверки состояния базы данных
+Simple script to check database connection and current state.
+Run this from bothost.ru web terminal: python check_db.py
 """
 import asyncio
+import logging
 from sqlalchemy import text
-from app.db.session import SessionLocal
+from app.db.session import async_session_maker
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 async def check_database():
-    print("🔍 Проверка базы данных...\n")
+    """Check database connection and table status."""
     
-    async with SessionLocal() as session:
-        try:
-            # Проверяем существующие таблицы
-            result = await session.execute(text("""
-                SELECT table_name 
-                FROM information_schema.tables 
-                WHERE table_schema = 'public' 
-                ORDER BY table_name
-            """))
-            tables = [row[0] for row in result.fetchall()]
+    try:
+        async with async_session_maker() as session:
+            logger.info("✅ Database connection successful!")
             
-            print(f"✅ Найдено таблиц: {len(tables)}\n")
-            
-            # Проверяем новые таблицы маркетплейса
-            marketplace_tables = [
-                'sellers', 'lots', 'lot_stock_items', 'deals', 
-                'deal_messages', 'deal_disputes', 'transactions',
-                'seller_withdrawals', 'seller_reviews', 'favorites', 'notifications'
-            ]
-            
-            print("📋 Проверка таблиц маркетплейса:")
-            for table in marketplace_tables:
-                if table in tables:
-                    print(f"  ✅ {table}")
-                else:
-                    print(f"  ❌ {table} - НЕ НАЙДЕНА!")
-            
-            # Проверяем поле balance в users
-            print("\n📋 Проверка поля balance в таблице users:")
+            # Check if users table has balance column
             result = await session.execute(text("""
                 SELECT column_name 
                 FROM information_schema.columns 
                 WHERE table_name = 'users' AND column_name = 'balance'
             """))
-            if result.fetchone():
-                print("  ✅ Поле balance существует")
+            has_balance = result.fetchone() is not None
+            
+            if has_balance:
+                logger.info("✅ users.balance column exists - migration already applied")
             else:
-                print("  ❌ Поле balance НЕ НАЙДЕНО!")
+                logger.warning("⚠️  users.balance column NOT found - migration needed")
             
-            # Проверяем количество пользователей
-            result = await session.execute(text("SELECT COUNT(*) FROM users"))
-            users_count = result.scalar()
-            print(f"\n👥 Пользователей в БД: {users_count}")
+            # Check if sellers table exists
+            result = await session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_name = 'sellers'
+            """))
+            has_sellers = result.fetchone() is not None
             
-            # Проверяем продавцов
-            if 'sellers' in tables:
-                result = await session.execute(text("SELECT COUNT(*) FROM sellers"))
-                sellers_count = result.scalar()
-                print(f"🏪 Продавцов в БД: {sellers_count}")
+            if has_sellers:
+                logger.info("✅ sellers table exists")
+            else:
+                logger.warning("⚠️  sellers table NOT found - migration needed")
             
-            # Проверяем лоты
-            if 'lots' in tables:
-                result = await session.execute(text("SELECT COUNT(*) FROM lots WHERE is_deleted = false"))
-                lots_count = result.scalar()
-                print(f"📦 Активных лотов: {lots_count}")
+            # List all tables
+            result = await session.execute(text("""
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public'
+                ORDER BY table_name
+            """))
+            tables = [row[0] for row in result.fetchall()]
+            logger.info(f"📋 Found {len(tables)} tables: {', '.join(tables)}")
             
-            print("\n✅ Проверка завершена!")
+            return has_balance and has_sellers
             
-        except Exception as e:
-            print(f"\n❌ Ошибка при проверке БД: {e}")
-            print("\n💡 Возможные причины:")
-            print("  1. Миграция не применена - запустите: alembic upgrade head")
-            print("  2. Неправильные данные подключения в .env")
-            print("  3. PostgreSQL не запущен")
+    except Exception as e:
+        logger.error(f"❌ Database check failed: {e}")
+        return False
 
 
 if __name__ == "__main__":
-    asyncio.run(check_database())
+    success = asyncio.run(check_database())
+    if success:
+        print("\n✅ Database is ready!")
+    else:
+        print("\n⚠️  Migration required! Run: python run_migrations.py")
+    exit(0 if success else 1)
