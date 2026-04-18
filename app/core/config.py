@@ -1,7 +1,8 @@
 from functools import lru_cache
 from decimal import Decimal
+from urllib.parse import urlparse
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,18 +19,58 @@ class Settings(BaseSettings):
     app_env: str = Field("dev", alias="APP_ENV")
     log_level: str = Field("INFO", alias="LOG_LEVEL")
 
-    db_host: str = Field(..., alias="POSTGRES_HOST")
+    # Railway-style DATABASE_URL (optional, takes precedence)
+    database_url_raw: str | None = Field(None, alias="DATABASE_URL")
+    
+    # Individual database fields (optional, used if DATABASE_URL not provided)
+    db_host: str | None = Field(None, alias="POSTGRES_HOST")
     db_port: int = Field(5432, alias="POSTGRES_PORT")
-    db_name: str = Field(..., alias="POSTGRES_DB")
-    db_user: str = Field(..., alias="POSTGRES_USER")
-    db_password: str = Field(..., alias="POSTGRES_PASSWORD")
+    db_name: str | None = Field(None, alias="POSTGRES_DB")
+    db_user: str | None = Field(None, alias="POSTGRES_USER")
+    db_password: str | None = Field(None, alias="POSTGRES_PASSWORD")
     db_ssl_mode: str = Field("require", alias="POSTGRES_SSL_MODE")
 
-    redis_host: str = Field(..., alias="REDIS_HOST")
+    # Railway-style REDIS_URL (optional, takes precedence)
+    redis_url_raw: str | None = Field(None, alias="REDIS_URL")
+    
+    # Individual Redis fields (optional, used if REDIS_URL not provided)
+    redis_host: str | None = Field(None, alias="REDIS_HOST")
     redis_port: int = Field(6379, alias="REDIS_PORT")
     redis_db: int = Field(0, alias="REDIS_DB")
     redis_password: str | None = Field(None, alias="REDIS_PASSWORD")
     redis_ssl: bool = Field(True, alias="REDIS_SSL")
+
+    @field_validator("database_url_raw", mode="after")
+    @classmethod
+    def parse_database_url(cls, v, info):
+        """Parse DATABASE_URL and populate individual fields if provided"""
+        if v:
+            parsed = urlparse(v)
+            # Store parsed values for later use
+            info.data["_db_parsed"] = {
+                "host": parsed.hostname,
+                "port": parsed.port or 5432,
+                "name": parsed.path.lstrip("/"),
+                "user": parsed.username,
+                "password": parsed.password,
+            }
+        return v
+
+    @field_validator("redis_url_raw", mode="after")
+    @classmethod
+    def parse_redis_url(cls, v, info):
+        """Parse REDIS_URL and populate individual fields if provided"""
+        if v:
+            parsed = urlparse(v)
+            # Store parsed values for later use
+            info.data["_redis_parsed"] = {
+                "host": parsed.hostname,
+                "port": parsed.port or 6379,
+                "db": int(parsed.path.lstrip("/")) if parsed.path and parsed.path != "/" else 0,
+                "password": parsed.password,
+                "ssl": parsed.scheme == "rediss",
+            }
+        return v
 
     shop_name: str = Field("Game Pay", alias="SHOP_NAME")
     super_admin_tg_id: int = Field(0, alias="SUPER_ADMIN_TG_ID")
@@ -56,6 +97,21 @@ class Settings(BaseSettings):
 
     @property
     def database_url(self) -> str:
+        # Use DATABASE_URL if provided (Railway style)
+        if self.database_url_raw:
+            # Convert postgres:// to postgresql+asyncpg://
+            url = self.database_url_raw.replace("postgres://", "postgresql+asyncpg://", 1)
+            # Ensure SSL mode is appended
+            if "?" not in url:
+                url += f"?ssl={self.db_ssl_mode}"
+            elif "ssl=" not in url:
+                url += f"&ssl={self.db_ssl_mode}"
+            return url
+        
+        # Otherwise use individual fields
+        if not all([self.db_host, self.db_name, self.db_user, self.db_password]):
+            raise ValueError("Either DATABASE_URL or individual database fields must be provided")
+        
         return (
             f"postgresql+asyncpg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
@@ -64,6 +120,21 @@ class Settings(BaseSettings):
 
     @property
     def sync_database_url(self) -> str:
+        # Use DATABASE_URL if provided (Railway style)
+        if self.database_url_raw:
+            # Convert postgres:// to postgresql+psycopg://
+            url = self.database_url_raw.replace("postgres://", "postgresql+psycopg://", 1)
+            # Ensure SSL mode is appended
+            if "?" not in url:
+                url += f"?sslmode={self.db_ssl_mode}"
+            elif "sslmode=" not in url:
+                url += f"&sslmode={self.db_ssl_mode}"
+            return url
+        
+        # Otherwise use individual fields
+        if not all([self.db_host, self.db_name, self.db_user, self.db_password]):
+            raise ValueError("Either DATABASE_URL or individual database fields must be provided")
+        
         return (
             f"postgresql+psycopg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"
@@ -72,6 +143,14 @@ class Settings(BaseSettings):
 
     @property
     def redis_url(self) -> str:
+        # Use REDIS_URL if provided (Railway style)
+        if self.redis_url_raw:
+            return self.redis_url_raw
+        
+        # Otherwise use individual fields
+        if not self.redis_host:
+            raise ValueError("Either REDIS_URL or REDIS_HOST must be provided")
+        
         scheme = "rediss" if self.redis_ssl else "redis"
         if self.redis_password:
             return f"{scheme}://:{self.redis_password}@{self.redis_host}:{self.redis_port}/{self.redis_db}"
