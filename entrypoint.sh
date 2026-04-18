@@ -7,7 +7,7 @@ echo "📦 Применяем миграции..."
 alembic upgrade head
 
 echo "🌱 Добавляем игры через SQL..."
-psql $DATABASE_URL -f seed_games.sql || echo "⚠️ SQL seed failed, continuing..."
+python seed_games_sql.py || echo "⚠️ SQL seed failed, continuing..."
 
 echo "✅ Готово. Запускаем FastAPI и бот..."
 
