@@ -11,7 +11,7 @@ from sqlalchemy import select, and_, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.db.session import get_session
+from app.db.session import get_db_session
 from app.models.entities import (
     Deal, DealMessage, DealDispute, Lot, User, Seller, Transaction
 )

@@ -10,7 +10,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
-from app.db.session import get_session
+from app.db.session import get_db_session
 from app.models import User
 from app.repositories.user_repository import UserRepository
 
