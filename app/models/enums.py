@@ -174,3 +174,10 @@ class NotificationType(StrEnum):
     REVIEW = "review"
     SYSTEM = "system"
     PRICE_ALERT = "price_alert"
+
+
+class LotStockStatus(StrEnum):
+    AVAILABLE = "available"
+    RESERVED = "reserved"
+    SOLD = "sold"
+    EXPIRED = "expired"
