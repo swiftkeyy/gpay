@@ -66,7 +66,7 @@ async def get_payment_methods():
 @router.post("/webhooks/yookassa")
 async def yookassa_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Handle ЮKassa webhook."""
     payload = await request.json()
@@ -90,7 +90,7 @@ async def yookassa_webhook(
 @router.post("/webhooks/tinkoff")
 async def tinkoff_webhook(
     request: Request,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Handle Tinkoff webhook."""
     payload = await request.json()
@@ -119,7 +119,7 @@ async def tinkoff_webhook(
 async def cloudpayments_webhook(
     request: Request,
     x_content_hmac: str = Header(None),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Handle CloudPayments webhook."""
     payload = await request.json()
@@ -148,7 +148,7 @@ async def cloudpayments_webhook(
 async def cryptobot_webhook(
     request: Request,
     crypto_pay_api_signature: str = Header(None),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Handle Crypto Bot webhook."""
     payload = await request.json()

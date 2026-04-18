@@ -51,7 +51,7 @@ async def get_games(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
     search: str | None = None,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get list of games with pagination."""
     query = select(Game).where(Game.is_active == True)
@@ -78,7 +78,7 @@ async def get_games(
 @router.get("/games/{game_id}")
 async def get_game(
     game_id: int,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get game details."""
     result = await session.execute(select(Game).where(Game.id == game_id))
@@ -100,7 +100,7 @@ async def get_game(
 @router.get("/categories", response_model=list[CategoryResponse])
 async def get_categories(
     game_id: int | None = None,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get list of categories."""
     query = select(Category).where(Category.is_active == True)
@@ -125,7 +125,7 @@ async def get_categories(
 @router.get("/products", response_model=list[ProductResponse])
 async def get_products(
     category_id: int | None = None,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get list of products."""
     query = select(Product).where(Product.is_active == True)
@@ -157,7 +157,7 @@ async def search_lots(
     sort_by: str = "popularity",
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Search lots with filters and sorting."""
     from app.models.enums import LotStatus
@@ -204,7 +204,7 @@ async def search_lots(
 @router.get("/lots/{lot_id}")
 async def get_lot(
     lot_id: int,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get lot details."""
     result = await session.execute(select(Lot).where(Lot.id == lot_id))
@@ -231,7 +231,7 @@ async def get_lot(
 async def add_to_favorites(
     lot_id: int,
     user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Add lot to favorites."""
     from app.models import Favorite
@@ -259,7 +259,7 @@ async def add_to_favorites(
 async def remove_from_favorites(
     lot_id: int,
     user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Remove lot from favorites."""
     from app.models import Favorite

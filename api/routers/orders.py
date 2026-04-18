@@ -70,7 +70,7 @@ class OrderListResponse(BaseModel):
 async def create_order(
     request: CreateOrderRequest,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Create order from cart with idempotency."""
     # Check for existing order with same idempotency key
@@ -205,7 +205,7 @@ async def get_orders(
     status: str | None = None,
     page: int = 1,
     limit: int = 20,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get user orders with pagination."""
     if limit > 100:
@@ -266,7 +266,7 @@ async def get_orders(
 async def get_order(
     order_id: int,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get order details."""
     return await _get_order_response(order_id, session, user_id)
@@ -277,7 +277,7 @@ async def initiate_payment(
     order_id: int,
     payment_method: str,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Initiate payment for order."""
     # Get order

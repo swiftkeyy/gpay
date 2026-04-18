@@ -80,7 +80,7 @@ class DisputeResponse(BaseModel):
 async def get_deal(
     deal_id: int,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get deal details."""
     # Get deal with lot
@@ -123,7 +123,7 @@ async def deliver_goods(
     deal_id: int,
     request: DeliverGoodsRequest,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Seller delivers goods manually."""
     # Get deal
@@ -167,7 +167,7 @@ async def confirm_delivery(
     deal_id: int,
     request: ConfirmDeliveryRequest,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Buyer confirms delivery and releases escrow."""
     # Get deal
@@ -216,7 +216,7 @@ async def open_dispute(
     deal_id: int,
     request: OpenDisputeRequest,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Open dispute for deal."""
     # Get deal
@@ -282,7 +282,7 @@ async def open_dispute(
 async def get_dispute(
     deal_id: int,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get dispute details."""
     # Get deal first to check access
@@ -326,7 +326,7 @@ async def resolve_dispute(
     dispute_id: int,
     request: ResolveDisputeRequest,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Admin resolves dispute."""
     # TODO: Check if user is admin
@@ -555,7 +555,7 @@ async def _partial_refund(deal: Deal, refund_amount: Decimal, session: AsyncSess
 
 @router.post("/auto-complete")
 async def auto_complete_deals(
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Auto-complete deals after timeout (cron job)."""
     # Get deals waiting for confirmation that passed auto_complete_at

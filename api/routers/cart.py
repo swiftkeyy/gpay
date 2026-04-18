@@ -63,7 +63,7 @@ class CartValidationResponse(BaseModel):
 @router.get("", response_model=CartResponse)
 async def get_cart(
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get user cart with all items."""
     # Get or create cart
@@ -126,7 +126,7 @@ async def get_cart(
 async def add_to_cart(
     request: AddToCartRequest,
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Add item to cart with stock reservation."""
     # Validate lot exists and is active
@@ -211,7 +211,7 @@ async def add_to_cart(
 async def update_cart_item(
     item_id: int,
     request: UpdateCartItemRequest,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Update cart item quantity with stock adjustment."""
     if request.quantity < 1:
@@ -256,7 +256,7 @@ async def update_cart_item(
 @router.delete("/items/{item_id}")
 async def remove_from_cart(
     item_id: int,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Remove item from cart and release reserved stock."""
     # Get cart item with lot
@@ -285,7 +285,7 @@ async def remove_from_cart(
 @router.delete("")
 async def clear_cart(
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Clear all items from cart and release all reserved stock."""
     # Get cart
@@ -318,7 +318,7 @@ async def clear_cart(
 @router.post("/validate", response_model=CartValidationResponse)
 async def validate_cart(
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Validate cart before checkout - check stock and prices."""
     # Get cart

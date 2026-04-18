@@ -29,7 +29,7 @@ class UpdateProfileRequest(BaseModel):
 @router.get("/me", response_model=UserProfileResponse)
 async def get_current_user(
     user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get current user profile."""
     user_repo = UserRepository(session)
@@ -54,7 +54,7 @@ async def get_current_user(
 async def update_current_user(
     request: UpdateProfileRequest,
     user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Update current user profile."""
     user_repo = UserRepository(session)
@@ -84,7 +84,7 @@ async def update_current_user(
 @router.get("/me/balance")
 async def get_balance(
     user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get user balance."""
     user_repo = UserRepository(session)
@@ -101,7 +101,7 @@ async def get_transactions(
     user_id: int = 1,  # TODO: Extract from auth token
     page: int = 1,
     limit: int = 20,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get user transaction history."""
     # TODO: Implement transaction repository
@@ -116,7 +116,7 @@ async def get_transactions(
 @router.get("/me/referrals")
 async def get_referrals(
     user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get referral stats."""
     # TODO: Implement referral repository

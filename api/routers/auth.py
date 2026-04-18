@@ -66,7 +66,7 @@ def validate_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
 @router.post("/telegram", response_model=AuthResponse)
 async def authenticate_telegram(
     request: TelegramAuthRequest,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Authenticate user via Telegram initData."""
     # Validate initData

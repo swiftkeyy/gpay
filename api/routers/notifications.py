@@ -14,7 +14,7 @@ async def get_notifications(
     user_id: int = 1,
     page: int = 1,
     limit: int = 20,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get user notifications."""
     # TODO: Implement notification retrieval
@@ -24,7 +24,7 @@ async def get_notifications(
 @router.patch("/{notification_id}/read")
 async def mark_as_read(
     notification_id: int,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Mark notification as read."""
     # TODO: Implement mark as read
@@ -34,7 +34,7 @@ async def mark_as_read(
 @router.post("/read-all")
 async def mark_all_as_read(
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Mark all notifications as read."""
     # TODO: Implement mark all as read
@@ -44,7 +44,7 @@ async def mark_all_as_read(
 @router.get("/unread-count")
 async def get_unread_count(
     user_id: int = 1,
-    session: AsyncSession = Depends(get_session)
+    session: AsyncSession = Depends(get_db_session)
 ):
     """Get unread notification count."""
     # TODO: Implement unread count
