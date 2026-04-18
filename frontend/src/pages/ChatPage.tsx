@@ -42,8 +42,8 @@ export default function ChatPage() {
   const [messageQueue, setMessageQueue] = useState<string[]>([])
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const typingTimeoutRef = useRef<NodeJS.Timeout>()
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+  const typingTimeoutRef = useRef<number>()
+  const reconnectTimeoutRef = useRef<number>()
   const wsRef = useRef<WebSocket | null>(null)
 
   const maxReconnectAttempts = 5

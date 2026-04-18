@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../api/client'
 import { useUIStore } from '../store/uiStore'
@@ -21,7 +21,6 @@ type OrderStatus = 'all' | 'pending' | 'paid' | 'completed' | 'cancelled'
 
 export default function OrdersPage() {
   const { t } = useTranslation()
-  const navigate = useNavigate()
   const { showToast } = useUIStore()
   
   const [orders, setOrders] = useState<Order[]>([])

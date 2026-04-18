@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../api/client'
 import { useUIStore } from '../store/uiStore'
@@ -85,7 +84,7 @@ export default function SellerDashboard() {
 
   const checkSellerStatus = async () => {
     try {
-      const response = await api.get('/sellers/me')
+      await api.get('/sellers/me')
       setIsSeller(true)
       setLoading(false)
     } catch (error: any) {
