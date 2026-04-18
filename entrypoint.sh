@@ -6,8 +6,8 @@ echo "🚀 Запуск Game Pay маркетплейса..."
 echo "📦 Применяем миграции..."
 alembic upgrade head
 
-echo "🌱 Добавляем игры через SQL..."
-python seed_games_sql.py || echo "⚠️ SQL seed failed, continuing..."
+echo "🌱 Заполняем базу данных..."
+python seed_games.py || echo "⚠️ Seed уже выполнен или произошла ошибка"
 
 echo "✅ Готово. Запускаем FastAPI и бот..."
 
