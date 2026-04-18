@@ -61,12 +61,29 @@ class Settings(BaseSettings):
     def parse_redis_url(cls, v, info):
         """Parse REDIS_URL and populate individual fields if provided"""
         if v:
-            parsed = urlparse(v)
+            # Railway sometimes provides malformed URLs like "https://redis://..."
+            # Clean it up by removing any leading protocol before redis://
+            cleaned_url = v
+            if "redis://" in v or "rediss://" in v:
+                # Extract the redis:// or rediss:// part onwards
+                if "redis://" in v:
+                    cleaned_url = "redis://" + v.split("redis://", 1)[1]
+                elif "rediss://" in v:
+                    cleaned_url = "rediss://" + v.split("rediss://", 1)[1]
+            
+            parsed = urlparse(cleaned_url)
             # Store parsed values for later use
+            db_num = 0
+            if parsed.path and parsed.path != "/":
+                try:
+                    db_num = int(parsed.path.lstrip("/"))
+                except (ValueError, AttributeError):
+                    db_num = 0
+            
             info.data["_redis_parsed"] = {
                 "host": parsed.hostname,
                 "port": parsed.port or 6379,
-                "db": int(parsed.path.lstrip("/")) if parsed.path and parsed.path != "/" else 0,
+                "db": db_num,
                 "password": parsed.password,
                 "ssl": parsed.scheme == "rediss",
             }
@@ -145,7 +162,16 @@ class Settings(BaseSettings):
     def redis_url(self) -> str:
         # Use REDIS_URL if provided (Railway style)
         if self.redis_url_raw:
-            return self.redis_url_raw
+            # Railway sometimes provides malformed URLs like "https://redis://..."
+            # Clean it up by removing any leading protocol before redis://
+            cleaned_url = self.redis_url_raw
+            if "redis://" in self.redis_url_raw or "rediss://" in self.redis_url_raw:
+                # Extract the redis:// or rediss:// part onwards
+                if "redis://" in self.redis_url_raw:
+                    cleaned_url = "redis://" + self.redis_url_raw.split("redis://", 1)[1]
+                elif "rediss://" in self.redis_url_raw:
+                    cleaned_url = "rediss://" + self.redis_url_raw.split("rediss://", 1)[1]
+            return cleaned_url
         
         # Otherwise use individual fields
         if not self.redis_host:
