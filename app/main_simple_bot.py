@@ -33,7 +33,7 @@ async def cmd_start(message: types.Message):
             [
                 InlineKeyboardButton(
                     text="🚀 Открыть магазин",
-                    web_app=WebAppInfo(url="https://gpay-frontend-at0uiargi-swiftkeyys-projects.vercel.app")
+                    web_app=WebAppInfo(url="https://gpay-frontend-self.vercel.app")
                 )
             ]
         ]
