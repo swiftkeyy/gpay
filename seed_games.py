@@ -3,7 +3,7 @@ import asyncio
 from decimal import Decimal
 from sqlalchemy import select
 
-from app.db.session import async_session_maker
+from app.db.session import session_factory
 from app.models.entities import Game, Category, Product, Price
 
 GAMES_DATA = [
@@ -179,7 +179,7 @@ PRODUCTS_DATA = {
 
 async def seed_games():
     """Seed games, categories, products and prices."""
-    async with async_session_maker() as session:
+    async with session_factory() as session:
         # Check if games already exist
         result = await session.execute(select(Game).limit(1))
         if result.scalar_one_or_none():
