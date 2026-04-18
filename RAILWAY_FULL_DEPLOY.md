@@ -64,21 +64,23 @@ REFERRAL_REWARD_PERCENT=5.0
 AUTO_COMPLETE_HOURS=72
 ```
 
-### Шаг 5: Запустите миграции
+### Шаг 5: Настройте Start Command
 
-**Через Railway CLI:**
+**В Railway Dashboard:**
+1. Settings → Deploy → Start Command:
+   ```bash
+   ./entrypoint.sh
+   ```
+
+> **Примечание:** Файл `entrypoint.sh` автоматически запускает миграции Alembic и затем бота. Это гарантирует правильный порядок запуска и защиту от ошибок миграций.
+
+**Альтернативно через Railway CLI:**
 ```bash
 npm install -g @railway/cli
 railway login
 railway link
 railway run alembic upgrade head
 ```
-
-**Или через Dashboard:**
-1. Settings → Deploy → Start Command:
-   ```
-   alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port $PORT
-   ```
 
 ### Шаг 6: Получите URL Backend
 
