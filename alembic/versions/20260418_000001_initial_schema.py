@@ -434,10 +434,25 @@ def upgrade() -> None:
     op.create_index('ix_notifications_user_read_created', 'notifications', ['user_id', 'is_read', 'created_at'])
     # Add enum constraint manually
     op.execute("ALTER TABLE notifications ADD CONSTRAINT ck_notifications_notification_type CHECK (notification_type::text = ANY (ARRAY['new_message'::text, 'new_order'::text, 'order_status'::text, 'payment'::text, 'review'::text, 'system'::text, 'price_alert'::text]))")
+    
+    # === BOT_SETTINGS — добавлено вручную после модернизации ===
+    op.create_table('bot_settings',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('key', sa.String(255), nullable=False),
+        sa.Column('value', sa.Text(), nullable=True),
+        sa.Column('description', sa.Text(), nullable=True),
+        sa.Column('is_public', sa.Boolean(), nullable=True, server_default=sa.text("true")),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('key', name='uq_bot_settings_key')
+    )
+    op.create_index('ix_bot_settings_key', 'bot_settings', ['key'], unique=True)
 
 
 def downgrade() -> None:
     # Drop tables in reverse order
+    op.drop_table('bot_settings')
     op.drop_table('notifications')
     op.drop_table('favorites')
     op.drop_table('seller_reviews')
