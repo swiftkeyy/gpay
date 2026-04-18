@@ -1,5 +1,6 @@
 """Seed games via raw SQL to bypass enum issues."""
 import asyncio
+from sqlalchemy import text
 from app.db.session import engine
 
 SQL = """
@@ -89,7 +90,7 @@ ON CONFLICT DO NOTHING;
 
 async def seed():
     async with engine.begin() as conn:
-        await conn.execute(SQL)
+        await conn.execute(text(SQL))
         print("✅ Games seeded successfully!")
 
 if __name__ == "__main__":
