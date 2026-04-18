@@ -1,8 +1,8 @@
-"""add marketplace features
+"""initial schema
 
-Revision ID: 20260414_000001
-Revises: 20260411_000001
-Create Date: 2026-04-14
+Revision ID: 20260418_000001
+Revises: None
+Create Date: 2026-04-18
 
 """
 from typing import Sequence, Union
@@ -12,17 +12,20 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '20260414_000001'
-down_revision: Union[str, None] = '20260411_000001'
+revision: str = '20260418_000001'
+down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Add balance to users
-    op.add_column('users', sa.Column('balance', sa.Numeric(12, 2), nullable=False, server_default=sa.text("0.00")))
-    
-    # Create new enums
+    # Create enums
+    op.execute("CREATE TYPE admin_role_enum AS ENUM ('super_admin', 'moderator', 'support')")
+    op.execute("CREATE TYPE game_enum AS ENUM ('brawl_stars', 'clash_royale', 'clash_of_clans', 'squad_busters')")
+    op.execute("CREATE TYPE product_type_enum AS ENUM ('gems', 'gold', 'account', 'pass', 'other')")
+    op.execute("CREATE TYPE order_status_enum AS ENUM ('pending', 'paid', 'processing', 'completed', 'canceled', 'refunded')")
+    op.execute("CREATE TYPE payment_provider_enum AS ENUM ('yukassa', 'tinkoff', 'cloudpayments', 'cryptobot', 'telegram_stars', 'balance')")
+    op.execute("CREATE TYPE payment_status_enum AS ENUM ('pending', 'processing', 'succeeded', 'failed', 'canceled', 'refunded')")
     op.execute("CREATE TYPE seller_status_enum AS ENUM ('pending', 'active', 'suspended', 'banned')")
     op.execute("CREATE TYPE lot_status_enum AS ENUM ('draft', 'active', 'paused', 'out_of_stock', 'deleted')")
     op.execute("CREATE TYPE lot_delivery_type_enum AS ENUM ('auto', 'manual', 'coordinates')")
@@ -32,6 +35,166 @@ def upgrade() -> None:
     op.execute("CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'rejected', 'canceled')")
     op.execute("CREATE TYPE dispute_status_enum AS ENUM ('open', 'in_review', 'resolved', 'closed')")
     op.execute("CREATE TYPE notification_type_enum AS ENUM ('new_message', 'new_order', 'order_status', 'payment', 'review', 'system', 'price_alert')")
+    op.execute("CREATE TYPE seller_review_status_enum AS ENUM ('hidden', 'published', 'rejected')")
+    
+    # Create users table
+    op.create_table('users',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('telegram_id', sa.BigInteger(), nullable=False),
+        sa.Column('username', sa.String(64), nullable=True),
+        sa.Column('first_name', sa.String(120), nullable=True),
+        sa.Column('last_name', sa.String(120), nullable=True),
+        sa.Column('is_blocked', sa.Boolean(), nullable=False, server_default=sa.text("false")),
+        sa.Column('block_reason', sa.Text(), nullable=True),
+        sa.Column('referred_by_user_id', sa.Integer(), nullable=True),
+        sa.Column('personal_discount_percent', sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column('referral_code', sa.String(32), nullable=True),
+        sa.Column('balance', sa.Numeric(12, 2), nullable=False, server_default=sa.text("0.00")),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['referred_by_user_id'], ['users.id'], ondelete='SET NULL'),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('telegram_id', name='uq_users_telegram_id'),
+        sa.UniqueConstraint('referral_code')
+    )
+    op.create_index('ix_users_blocked_created', 'users', ['is_blocked', 'created_at'])
+    
+    # Create admins table
+    op.create_table('admins',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('role', sa.Enum('super_admin', 'moderator', 'support', name='admin_role_enum'), nullable=False),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('user_id', name='uq_admins_user_id')
+    )
+    
+    # Create carts table
+    op.create_table('carts',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('user_id', name='uq_carts_user_id')
+    )
+
+    
+    # Create games table
+    op.create_table('games',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('name', sa.Enum('brawl_stars', 'clash_royale', 'clash_of_clans', 'squad_busters', name='game_enum'), nullable=False),
+        sa.Column('display_name', sa.String(100), nullable=False),
+        sa.Column('icon_url', sa.String(500), nullable=True),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column('sort_order', sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('name', name='uq_games_name')
+    )
+    
+    # Create products table
+    op.create_table('products',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('game_id', sa.Integer(), nullable=False),
+        sa.Column('product_type', sa.Enum('gems', 'gold', 'account', 'pass', 'other', name='product_type_enum'), nullable=False),
+        sa.Column('name', sa.String(255), nullable=False),
+        sa.Column('description', sa.Text(), nullable=True),
+        sa.Column('base_price', sa.Numeric(12, 2), nullable=False),
+        sa.Column('currency_code', sa.String(10), nullable=False, server_default=sa.text("'RUB'")),
+        sa.Column('image_url', sa.String(500), nullable=True),
+        sa.Column('is_active', sa.Boolean(), nullable=False, server_default=sa.text("true")),
+        sa.Column('sort_order', sa.Integer(), nullable=False, server_default=sa.text("0")),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['game_id'], ['games.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_products_game_type_active', 'products', ['game_id', 'product_type', 'is_active'])
+    
+    # Create media_files table
+    op.create_table('media_files',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('telegram_file_id', sa.String(255), nullable=False),
+        sa.Column('file_type', sa.String(50), nullable=False),
+        sa.Column('file_size', sa.Integer(), nullable=True),
+        sa.Column('uploaded_by_user_id', sa.Integer(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['uploaded_by_user_id'], ['users.id'], ondelete='SET NULL'),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('telegram_file_id', name='uq_media_files_telegram_file_id')
+    )
+    
+    # Create cart_items table
+    op.create_table('cart_items',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('cart_id', sa.Integer(), nullable=False),
+        sa.Column('product_id', sa.Integer(), nullable=False),
+        sa.Column('quantity', sa.Integer(), nullable=False, server_default=sa.text("1")),
+        sa.Column('price_at_add', sa.Numeric(12, 2), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['cart_id'], ['carts.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['product_id'], ['products.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id'),
+        sa.UniqueConstraint('cart_id', 'product_id', name='uq_cart_items_cart_product')
+    )
+    
+    # Create orders table
+    op.create_table('orders',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('status', sa.Enum('pending', 'paid', 'processing', 'completed', 'canceled', 'refunded', name='order_status_enum'), nullable=False, server_default=sa.text("'pending'")),
+        sa.Column('total_amount', sa.Numeric(12, 2), nullable=False),
+        sa.Column('discount_amount', sa.Numeric(12, 2), nullable=False, server_default=sa.text("0.00")),
+        sa.Column('final_amount', sa.Numeric(12, 2), nullable=False),
+        sa.Column('currency_code', sa.String(10), nullable=False, server_default=sa.text("'RUB'")),
+        sa.Column('promo_code_id', sa.Integer(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_orders_user_status_created', 'orders', ['user_id', 'status', 'created_at'])
+    
+    # Create order_items table
+    op.create_table('order_items',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('order_id', sa.Integer(), nullable=False),
+        sa.Column('product_id', sa.Integer(), nullable=False),
+        sa.Column('quantity', sa.Integer(), nullable=False),
+        sa.Column('price_per_unit', sa.Numeric(12, 2), nullable=False),
+        sa.Column('total_price', sa.Numeric(12, 2), nullable=False),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ondelete='CASCADE'),
+        sa.ForeignKeyConstraint(['product_id'], ['products.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    
+    # Create payments table
+    op.create_table('payments',
+        sa.Column('id', sa.Integer(), nullable=False),
+        sa.Column('order_id', sa.Integer(), nullable=False),
+        sa.Column('provider', sa.Enum('yukassa', 'tinkoff', 'cloudpayments', 'cryptobot', 'telegram_stars', 'balance', name='payment_provider_enum'), nullable=False),
+        sa.Column('status', sa.Enum('pending', 'processing', 'succeeded', 'failed', 'canceled', 'refunded', name='payment_status_enum'), nullable=False, server_default=sa.text("'pending'")),
+        sa.Column('amount', sa.Numeric(12, 2), nullable=False),
+        sa.Column('currency_code', sa.String(10), nullable=False, server_default=sa.text("'RUB'")),
+        sa.Column('provider_payment_id', sa.String(255), nullable=True),
+        sa.Column('provider_response', postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column('payment_url', sa.String(1000), nullable=True),
+        sa.Column('paid_at', sa.DateTime(timezone=True), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.ForeignKeyConstraint(['order_id'], ['orders.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_payments_order_status', 'payments', ['order_id', 'status'])
+    op.create_index('ix_payments_provider_payment_id', 'payments', ['provider_payment_id'])
+
     
     # Create sellers table
     op.create_table('sellers',
@@ -165,6 +328,7 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('deal_id', name='uq_deal_disputes_deal_id')
     )
+
     
     # Create transactions table
     op.create_table('transactions',
@@ -260,7 +424,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop tables
+    # Drop tables in reverse order
     op.drop_table('notifications')
     op.drop_table('favorites')
     op.drop_table('seller_reviews')
@@ -272,8 +436,19 @@ def downgrade() -> None:
     op.drop_table('deals')
     op.drop_table('lots')
     op.drop_table('sellers')
+    op.drop_table('payments')
+    op.drop_table('order_items')
+    op.drop_table('orders')
+    op.drop_table('cart_items')
+    op.drop_table('media_files')
+    op.drop_table('products')
+    op.drop_table('games')
+    op.drop_table('carts')
+    op.drop_table('admins')
+    op.drop_table('users')
     
     # Drop enums
+    op.execute("DROP TYPE IF EXISTS seller_review_status_enum")
     op.execute("DROP TYPE IF EXISTS notification_type_enum")
     op.execute("DROP TYPE IF EXISTS dispute_status_enum")
     op.execute("DROP TYPE IF EXISTS withdrawal_status_enum")
@@ -283,6 +458,9 @@ def downgrade() -> None:
     op.execute("DROP TYPE IF EXISTS lot_delivery_type_enum")
     op.execute("DROP TYPE IF EXISTS lot_status_enum")
     op.execute("DROP TYPE IF EXISTS seller_status_enum")
-    
-    # Remove balance from users
-    op.drop_column('users', 'balance')
+    op.execute("DROP TYPE IF EXISTS payment_status_enum")
+    op.execute("DROP TYPE IF EXISTS payment_provider_enum")
+    op.execute("DROP TYPE IF EXISTS order_status_enum")
+    op.execute("DROP TYPE IF EXISTS product_type_enum")
+    op.execute("DROP TYPE IF EXISTS game_enum")
+    op.execute("DROP TYPE IF EXISTS admin_role_enum")
