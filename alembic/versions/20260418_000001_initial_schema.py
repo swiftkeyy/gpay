@@ -19,23 +19,23 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Create enums
-    op.execute("CREATE TYPE admin_role_enum AS ENUM ('super_admin', 'moderator', 'support')")
-    op.execute("CREATE TYPE game_enum AS ENUM ('brawl_stars', 'clash_royale', 'clash_of_clans', 'squad_busters')")
-    op.execute("CREATE TYPE product_type_enum AS ENUM ('gems', 'gold', 'account', 'pass', 'other')")
-    op.execute("CREATE TYPE order_status_enum AS ENUM ('pending', 'paid', 'processing', 'completed', 'canceled', 'refunded')")
-    op.execute("CREATE TYPE payment_provider_enum AS ENUM ('yukassa', 'tinkoff', 'cloudpayments', 'cryptobot', 'telegram_stars', 'balance')")
-    op.execute("CREATE TYPE payment_status_enum AS ENUM ('pending', 'processing', 'succeeded', 'failed', 'canceled', 'refunded')")
-    op.execute("CREATE TYPE seller_status_enum AS ENUM ('pending', 'active', 'suspended', 'banned')")
-    op.execute("CREATE TYPE lot_status_enum AS ENUM ('draft', 'active', 'paused', 'out_of_stock', 'deleted')")
-    op.execute("CREATE TYPE lot_delivery_type_enum AS ENUM ('auto', 'manual', 'coordinates')")
-    op.execute("CREATE TYPE deal_status_enum AS ENUM ('created', 'paid', 'in_progress', 'waiting_confirmation', 'completed', 'canceled', 'dispute', 'refunded')")
-    op.execute("CREATE TYPE transaction_type_enum AS ENUM ('deposit', 'purchase', 'sale', 'refund', 'withdrawal', 'commission', 'bonus', 'penalty')")
-    op.execute("CREATE TYPE transaction_status_enum AS ENUM ('pending', 'completed', 'failed', 'canceled')")
-    op.execute("CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'rejected', 'canceled')")
-    op.execute("CREATE TYPE dispute_status_enum AS ENUM ('open', 'in_review', 'resolved', 'closed')")
-    op.execute("CREATE TYPE notification_type_enum AS ENUM ('new_message', 'new_order', 'order_status', 'payment', 'review', 'system', 'price_alert')")
-    op.execute("CREATE TYPE seller_review_status_enum AS ENUM ('hidden', 'published', 'rejected')")
+    # Create enums (with IF NOT EXISTS to handle existing types)
+    op.execute("DO $$ BEGIN CREATE TYPE admin_role_enum AS ENUM ('super_admin', 'moderator', 'support'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE game_enum AS ENUM ('brawl_stars', 'clash_royale', 'clash_of_clans', 'squad_busters'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE product_type_enum AS ENUM ('gems', 'gold', 'account', 'pass', 'other'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE order_status_enum AS ENUM ('pending', 'paid', 'processing', 'completed', 'canceled', 'refunded'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE payment_provider_enum AS ENUM ('yukassa', 'tinkoff', 'cloudpayments', 'cryptobot', 'telegram_stars', 'balance'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE payment_status_enum AS ENUM ('pending', 'processing', 'succeeded', 'failed', 'canceled', 'refunded'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE seller_status_enum AS ENUM ('pending', 'active', 'suspended', 'banned'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE lot_status_enum AS ENUM ('draft', 'active', 'paused', 'out_of_stock', 'deleted'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE lot_delivery_type_enum AS ENUM ('auto', 'manual', 'coordinates'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE deal_status_enum AS ENUM ('created', 'paid', 'in_progress', 'waiting_confirmation', 'completed', 'canceled', 'dispute', 'refunded'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE transaction_type_enum AS ENUM ('deposit', 'purchase', 'sale', 'refund', 'withdrawal', 'commission', 'bonus', 'penalty'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE transaction_status_enum AS ENUM ('pending', 'completed', 'failed', 'canceled'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'rejected', 'canceled'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE dispute_status_enum AS ENUM ('open', 'in_review', 'resolved', 'closed'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE notification_type_enum AS ENUM ('new_message', 'new_order', 'order_status', 'payment', 'review', 'system', 'price_alert'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
+    op.execute("DO $$ BEGIN CREATE TYPE seller_review_status_enum AS ENUM ('hidden', 'published', 'rejected'); EXCEPTION WHEN duplicate_object THEN null; END $$;")
     
     # Create users table
     op.create_table('users',
