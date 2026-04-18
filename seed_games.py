@@ -228,9 +228,12 @@ async def seed_games():
                 game_slug = cat_key.split(":")[0]
                 game = games_map[game_slug]
                 
-                for prod_data in products:
+                for idx, prod_data in enumerate(products):
+                    # Make slug unique per game
+                    unique_slug = f"{game_slug}-{prod_data['slug']}"
+                    
                     product = Product(
-                        slug=prod_data["slug"],
+                        slug=unique_slug,
                         title=prod_data["title"],
                         game_id=game.id,
                         category_id=category.id,
@@ -250,7 +253,10 @@ async def seed_games():
                     session.add(price)
                     
                     product_count += 1
-                    print(f"  ✓ {game.title} → {category.title} → {product.title} ({prod_data['price']} ₽)")
+                    if product_count % 10 == 0:
+                        print(f"  ✓ Created {product_count} products...")
+        
+        print(f"  ✓ Total: {product_count} products created")
         
         await session.commit()
         print(f"\n✅ Seeding complete! Created {len(games_map)} games, {len(categories_map)} categories, {product_count} products!")
