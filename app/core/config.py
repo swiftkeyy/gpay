@@ -116,8 +116,20 @@ class Settings(BaseSettings):
     def database_url(self) -> str:
         # Use DATABASE_URL if provided (Railway style)
         if self.database_url_raw:
+            # Railway sometimes provides malformed URLs like "https://postgres://..."
+            # Clean it up by removing any leading protocol before postgres://
+            cleaned_url = self.database_url_raw
+            if "postgres://" in self.database_url_raw or "postgresql://" in self.database_url_raw:
+                # Extract the postgres:// or postgresql:// part onwards
+                if "postgres://" in self.database_url_raw:
+                    cleaned_url = "postgres://" + self.database_url_raw.split("postgres://", 1)[1]
+                elif "postgresql://" in self.database_url_raw:
+                    cleaned_url = "postgresql://" + self.database_url_raw.split("postgresql://", 1)[1]
+            
             # Convert postgres:// to postgresql+asyncpg://
-            url = self.database_url_raw.replace("postgres://", "postgresql+asyncpg://", 1)
+            url = cleaned_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+            
             # Ensure SSL mode is appended
             if "?" not in url:
                 url += f"?ssl={self.db_ssl_mode}"
@@ -139,8 +151,20 @@ class Settings(BaseSettings):
     def sync_database_url(self) -> str:
         # Use DATABASE_URL if provided (Railway style)
         if self.database_url_raw:
+            # Railway sometimes provides malformed URLs like "https://postgres://..."
+            # Clean it up by removing any leading protocol before postgres://
+            cleaned_url = self.database_url_raw
+            if "postgres://" in self.database_url_raw or "postgresql://" in self.database_url_raw:
+                # Extract the postgres:// or postgresql:// part onwards
+                if "postgres://" in self.database_url_raw:
+                    cleaned_url = "postgres://" + self.database_url_raw.split("postgres://", 1)[1]
+                elif "postgresql://" in self.database_url_raw:
+                    cleaned_url = "postgresql://" + self.database_url_raw.split("postgresql://", 1)[1]
+            
             # Convert postgres:// to postgresql+psycopg://
-            url = self.database_url_raw.replace("postgres://", "postgresql+psycopg://", 1)
+            url = cleaned_url.replace("postgres://", "postgresql+psycopg://", 1)
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+            
             # Ensure SSL mode is appended
             if "?" not in url:
                 url += f"?sslmode={self.db_ssl_mode}"
