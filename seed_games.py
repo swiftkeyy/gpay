@@ -1,9 +1,10 @@
-"""Seed games and categories."""
+"""Seed games, categories, products and prices."""
 import asyncio
+from decimal import Decimal
 from sqlalchemy import select
 
 from app.db.session import async_session_maker
-from app.models.entities import Game, Category
+from app.models.entities import Game, Category, Product, Price
 
 GAMES_DATA = [
     {"slug": "brawl-stars", "title": "Brawl Stars", "sort_order": 1},
@@ -81,9 +82,103 @@ CATEGORIES_DATA = {
     ],
 }
 
+# Товары для каждой категории
+PRODUCTS_DATA = {
+    "gems": [
+        {"slug": "gems-30", "title": "30 гемов", "price": 99},
+        {"slug": "gems-80", "title": "80 гемов", "price": 249},
+        {"slug": "gems-170", "title": "170 гемов", "price": 499},
+        {"slug": "gems-360", "title": "360 гемов", "price": 999},
+        {"slug": "gems-950", "title": "950 гемов", "price": 2499},
+        {"slug": "gems-2000", "title": "2000 гемов", "price": 4999},
+    ],
+    "gold": [
+        {"slug": "gold-1000", "title": "1000 золота", "price": 49},
+        {"slug": "gold-5000", "title": "5000 золота", "price": 199},
+        {"slug": "gold-10000", "title": "10000 золота", "price": 349},
+        {"slug": "gold-50000", "title": "50000 золота", "price": 1499},
+    ],
+    "robux": [
+        {"slug": "robux-400", "title": "400 Robux", "price": 299},
+        {"slug": "robux-800", "title": "800 Robux", "price": 599},
+        {"slug": "robux-1700", "title": "1700 Robux", "price": 1199},
+        {"slug": "robux-4500", "title": "4500 Robux", "price": 2999},
+    ],
+    "primogems": [
+        {"slug": "primogems-60", "title": "60 Примогемов", "price": 59},
+        {"slug": "primogems-300", "title": "300 Примогемов", "price": 299},
+        {"slug": "primogems-980", "title": "980 Примогемов", "price": 899},
+        {"slug": "primogems-1980", "title": "1980 Примогемов", "price": 1799},
+        {"slug": "primogems-3280", "title": "3280 Примогемов", "price": 2999},
+        {"slug": "primogems-6480", "title": "6480 Примогемов", "price": 5999},
+    ],
+    "uc": [
+        {"slug": "uc-60", "title": "60 UC", "price": 59},
+        {"slug": "uc-325", "title": "325 UC", "price": 299},
+        {"slug": "uc-660", "title": "660 UC", "price": 599},
+        {"slug": "uc-1800", "title": "1800 UC", "price": 1499},
+    ],
+    "vp": [
+        {"slug": "vp-475", "title": "475 VP", "price": 399},
+        {"slug": "vp-1000", "title": "1000 VP", "price": 799},
+        {"slug": "vp-2050", "title": "2050 VP", "price": 1599},
+        {"slug": "vp-3650", "title": "3650 VP", "price": 2799},
+    ],
+    "accounts": [
+        {"slug": "starter-account", "title": "Стартовый аккаунт", "price": 199},
+        {"slug": "mid-account", "title": "Средний аккаунт", "price": 999},
+        {"slug": "high-account", "title": "Прокачанный аккаунт", "price": 2999},
+        {"slug": "pro-account", "title": "ТОП аккаунт", "price": 9999},
+    ],
+    "brawl-pass": [
+        {"slug": "brawl-pass-season", "title": "Brawl Pass (сезон)", "price": 169},
+    ],
+    "gold-pass": [
+        {"slug": "gold-pass-month", "title": "Gold Pass (месяц)", "price": 399},
+    ],
+    "welkin-moon": [
+        {"slug": "welkin-moon", "title": "Благословение луны", "price": 299},
+    ],
+    "royal-pass": [
+        {"slug": "royal-pass-season", "title": "Royal Pass (сезон)", "price": 599},
+    ],
+    "battle-pass": [
+        {"slug": "battle-pass-season", "title": "Battle Pass (сезон)", "price": 799},
+    ],
+    "minecoins": [
+        {"slug": "minecoins-320", "title": "320 Minecoins", "price": 149},
+        {"slug": "minecoins-1020", "title": "1020 Minecoins", "price": 449},
+        {"slug": "minecoins-3500", "title": "3500 Minecoins", "price": 1499},
+    ],
+    "skins": [
+        {"slug": "rare-skin", "title": "Редкий скин", "price": 299},
+        {"slug": "epic-skin", "title": "Эпический скин", "price": 799},
+        {"slug": "legendary-skin", "title": "Легендарный скин", "price": 1999},
+    ],
+    "items": [
+        {"slug": "common-item", "title": "Обычный предмет", "price": 99},
+        {"slug": "rare-item", "title": "Редкий предмет", "price": 299},
+        {"slug": "mythical-item", "title": "Мифический предмет", "price": 999},
+        {"slug": "immortal-item", "title": "Бессмертный предмет", "price": 2999},
+    ],
+    "cases": [
+        {"slug": "weapon-case", "title": "Кейс с оружием", "price": 199},
+        {"slug": "rare-case", "title": "Редкий кейс", "price": 499},
+        {"slug": "operation-case", "title": "Операционный кейс", "price": 799},
+    ],
+    "game-passes": [
+        {"slug": "vip-pass", "title": "VIP Pass", "price": 399},
+        {"slug": "premium-pass", "title": "Premium Pass", "price": 799},
+    ],
+    "realms": [
+        {"slug": "realm-1month", "title": "Realm (1 месяц)", "price": 499},
+        {"slug": "realm-6months", "title": "Realm (6 месяцев)", "price": 2499},
+    ],
+}
+
 
 async def seed_games():
-    """Seed games and categories."""
+    """Seed games, categories, products and prices."""
     async with async_session_maker() as session:
         # Check if games already exist
         result = await session.execute(select(Game).limit(1))
@@ -104,6 +199,7 @@ async def seed_games():
         
         # Create categories
         print("\n🌱 Seeding categories...")
+        categories_map = {}
         for game_slug, categories in CATEGORIES_DATA.items():
             if game_slug in games_map:
                 game = games_map[game_slug]
@@ -114,10 +210,50 @@ async def seed_games():
                         is_active=True
                     )
                     session.add(category)
+                    await session.flush()
+                    categories_map[f"{game_slug}:{cat_data['slug']}"] = category
                     print(f"  ✓ {game.title} → {category.title}")
         
+        # Create products and prices
+        print("\n🌱 Seeding products...")
+        product_count = 0
+        for cat_slug, products in PRODUCTS_DATA.items():
+            # Find all categories with this slug
+            matching_cats = [
+                (key, cat) for key, cat in categories_map.items()
+                if key.endswith(f":{cat_slug}")
+            ]
+            
+            for cat_key, category in matching_cats:
+                game_slug = cat_key.split(":")[0]
+                game = games_map[game_slug]
+                
+                for prod_data in products:
+                    product = Product(
+                        slug=prod_data["slug"],
+                        title=prod_data["title"],
+                        game_id=game.id,
+                        category_id=category.id,
+                        is_active=True,
+                        is_featured=(product_count % 5 == 0),  # Каждый 5-й товар featured
+                    )
+                    session.add(product)
+                    await session.flush()
+                    
+                    # Create price
+                    price = Price(
+                        product_id=product.id,
+                        base_price=Decimal(str(prod_data["price"])),
+                        currency_code="RUB",
+                        is_active=True,
+                    )
+                    session.add(price)
+                    
+                    product_count += 1
+                    print(f"  ✓ {game.title} → {category.title} → {product.title} ({prod_data['price']} ₽)")
+        
         await session.commit()
-        print("\n✅ Seeding complete!")
+        print(f"\n✅ Seeding complete! Created {len(games_map)} games, {len(categories_map)} categories, {product_count} products!")
 
 
 if __name__ == "__main__":

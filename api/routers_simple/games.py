@@ -18,15 +18,19 @@ async def get_games(session: AsyncSession = Depends(get_db_session)):
     result = await session.execute(stmt)
     games = result.scalars().all()
     
-    return [
-        {
-            "id": game.id,
-            "slug": game.slug,
-            "title": game.title,
-            "description": game.description,
-            "image_id": game.image_id,
-            "is_active": game.is_active,
-            "sort_order": game.sort_order,
-        }
-        for game in games
-    ]
+    return {
+        "items": [
+            {
+                "id": game.id,
+                "slug": game.slug,
+                "name": game.title,  # Frontend expects "name"
+                "title": game.title,
+                "description": game.description,
+                "image_id": game.image_id,
+                "is_active": game.is_active,
+                "sort_order": game.sort_order,
+            }
+            for game in games
+        ],
+        "total": len(games)
+    }

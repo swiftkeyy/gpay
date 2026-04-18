@@ -31,6 +31,7 @@ async def get_categories(
             "id": cat.id,
             "game_id": cat.game_id,
             "slug": cat.slug,
+            "name": cat.title,  # Frontend expects "name"
             "title": cat.title,
             "description": cat.description,
             "image_id": cat.image_id,
