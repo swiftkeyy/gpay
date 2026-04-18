@@ -23,11 +23,17 @@
 
 ## 🚀 Следующие шаги
 
-### Вариант 1: Быстрый деплой (10 минут)
-Следуйте инструкции: [QUICK_DEPLOY.md](QUICK_DEPLOY.md)
+### Вариант 1: Всё на Railway (Рекомендуется) 🚂
+**Стоимость:** $5/месяц (всё включено)
+- Backend + Frontend + PostgreSQL + Redis на Railway
+- Следуйте: [RAILWAY_FULL_DEPLOY.md](RAILWAY_FULL_DEPLOY.md)
+- Или быстрый старт: [QUICK_DEPLOY.md](QUICK_DEPLOY.md) - Вариант 1
 
-### Вариант 2: Подробный деплой (30 минут)
-Следуйте инструкции: [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)
+### Вариант 2: Railway + Vercel
+**Стоимость:** $5/месяц (Backend) + $0 (Frontend бесплатно)
+- Backend на Railway, Frontend на Vercel
+- Следуйте: [DEPLOY_CHECKLIST.md](DEPLOY_CHECKLIST.md)
+- Или быстрый старт: [QUICK_DEPLOY.md](QUICK_DEPLOY.md) - Вариант 2
 
 ### Вариант 3: Полная документация
 Читайте: [RAILWAY_DEPLOY.md](RAILWAY_DEPLOY.md)
@@ -52,16 +58,21 @@
 
 ## 💰 Стоимость
 
-**Railway (Backend + DB):**
-- $5/месяц (Hobby план)
+### Вариант 1: Всё на Railway (Рекомендуется)
+**$5/месяц** - всё включено:
+- Backend (FastAPI)
+- Frontend (Vite/React)
+- PostgreSQL
+- Redis
 - 500 часов выполнения
-- PostgreSQL и Redis включены
 
-**Vercel (Frontend):**
-- $0/месяц (бесплатно для личных проектов)
-- $20/месяц (для коммерческих)
+### Вариант 2: Railway + Vercel
+**$5/месяц** (или бесплатно для личных проектов):
+- Railway Backend: $5/месяц (PostgreSQL + Redis включены)
+- Vercel Frontend: $0/месяц (бесплатно для личных проектов)
+- Vercel Pro: $20/месяц (для коммерческих проектов)
 
-**Итого:** $5-25/месяц
+**Рекомендация:** Начните с Варианта 1 (всё на Railway) - проще и дешевле!
 
 ---
 
