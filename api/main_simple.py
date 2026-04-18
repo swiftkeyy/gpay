@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
-from api.routers_simple import games, categories, products
+from api.routers_simple import auth, games, categories, products
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ async def root():
 
 
 # Include routers
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
 app.include_router(games.router, prefix="/api/v1", tags=["Games"])
 app.include_router(categories.router, prefix="/api/v1", tags=["Categories"])
 app.include_router(products.router, prefix="/api/v1", tags=["Products"])
