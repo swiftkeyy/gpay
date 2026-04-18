@@ -11,10 +11,8 @@ alembic upgrade head
 # echo "🌱 Запускаем seed.py..."
 # python seed.py
 
-echo "✅ Всё готово. Запускаем FastAPI и бот..."
-
-# Запуск FastAPI в фоне
-uvicorn api.main:app --host 0.0.0.0 --port ${PORT:-8000} &
+echo "✅ Всё готово. Запускаем бот..."
 
 # Запуск бота (Telegram bot через aiogram)
+# FastAPI временно отключен до исправления импортов в api/routers
 exec python -m app.main
