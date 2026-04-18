@@ -23,8 +23,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="P2P Marketplace API",
-    description="REST API for Telegram Mini App P2P Marketplace",
+    title="Game Pay API",
+    description="REST API for Game Pay - Telegram Mini App P2P Marketplace",
     version="1.0.0",
     lifespan=lifespan,
     docs_url="/api/docs",
@@ -47,7 +47,7 @@ app.add_middleware(
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "healthy", "service": "p2p-marketplace-api"}
+    return {"status": "healthy", "service": "game-pay-api"}
 
 
 # Root endpoint
@@ -55,7 +55,7 @@ async def health_check():
 async def root():
     """Root endpoint."""
     return {
-        "message": "P2P Marketplace API",
+        "message": "Game Pay API",
         "docs": "/api/docs",
         "health": "/health"
     }
