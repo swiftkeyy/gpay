@@ -6,9 +6,6 @@ echo "🚀 Запуск Game Pay маркетплейса..."
 echo "📦 Применяем миграции..."
 alembic upgrade head
 
-echo "🌱 Добавляем игры и категории..."
-python seed_games.py
-
 echo "✅ Миграции применены. Запускаем FastAPI и бот..."
 
 # Запуск FastAPI в фоне
