@@ -239,6 +239,7 @@ async def seed_games():
                         category_id=category.id,
                         is_active=True,
                         is_featured=(product_count % 5 == 0),  # Каждый 5-й товар featured
+                        # Не указываем fulfillment_type - используется default из модели
                     )
                     session.add(product)
                     await session.flush()
