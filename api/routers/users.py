@@ -19,6 +19,8 @@ class UserProfileResponse(BaseModel):
     balance: float
     referral_code: str
     language_code: str
+    is_admin: bool
+    is_seller: bool
     created_at: str
 
 
@@ -38,6 +40,7 @@ async def get_current_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
+    # TODO: Check if user is admin or seller from respective tables
     return UserProfileResponse(
         id=user.id,
         telegram_id=user.telegram_id,
@@ -45,7 +48,9 @@ async def get_current_user(
         first_name=user.first_name,
         balance=float(user.balance),
         referral_code=user.referral_code,
-        language_code=user.language_code,
+        language_code=user.language_code or "ru",
+        is_admin=False,  # TODO: Check admins table
+        is_seller=False,  # TODO: Check sellers table
         created_at=user.created_at.isoformat()
     )
 
@@ -76,7 +81,9 @@ async def update_current_user(
         first_name=user.first_name,
         balance=float(user.balance),
         referral_code=user.referral_code,
-        language_code=user.language_code,
+        language_code=user.language_code or "ru",
+        is_admin=False,  # TODO: Check admins table
+        is_seller=False,  # TODO: Check sellers table
         created_at=user.created_at.isoformat()
     )
 
@@ -119,9 +126,15 @@ async def get_referrals(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Get referral stats."""
-    # TODO: Implement referral repository
+    user_repo = UserRepository(session)
+    user = await user_repo.get_by_id(user_id)
+    
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # TODO: Implement referral repository to get real stats
     return {
-        "referral_code": "ABC123",
-        "invited_users": 0,
-        "total_rewards": 0.00
+        "referral_code": user.referral_code,
+        "total_referrals": 0,
+        "total_earned": 0.00
     }

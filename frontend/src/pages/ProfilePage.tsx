@@ -73,10 +73,11 @@ export default function ProfilePage() {
 
   if (!user) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center pb-20">
         <div className="text-center">
           <p className="mb-4">{t('profile.notAuthenticated')}</p>
         </div>
+        <BottomNav />
       </div>
     )
   }
@@ -102,7 +103,9 @@ export default function ProfilePage() {
         {/* Balance Card */}
         <div className="bg-white bg-opacity-20 backdrop-blur rounded-lg p-4">
           <div className="text-sm opacity-90 mb-1">{t('profile.balance')}</div>
-          <div className="text-3xl font-bold">{user.balance.toFixed(2)} ₽</div>
+          <div className="text-3xl font-bold">
+            {typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'} ₽
+          </div>
           <button className="mt-2 text-sm underline opacity-90">
             {t('profile.topUp')}
           </button>
@@ -125,7 +128,9 @@ export default function ProfilePage() {
               </div>
               <div className="bg-white rounded-lg p-3">
                 <div className="text-sm text-gray-600">{t('profile.earned')}</div>
-                <div className="text-2xl font-bold">{referralStats.total_earned.toFixed(0)} ₽</div>
+                <div className="text-2xl font-bold">
+                  {typeof referralStats.total_earned === 'number' ? referralStats.total_earned.toFixed(0) : '0'} ₽
+                </div>
               </div>
             </div>
 
