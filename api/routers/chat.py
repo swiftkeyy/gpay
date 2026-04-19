@@ -11,7 +11,7 @@ from sqlalchemy import select, and_, or_
 
 from app.db.session import get_db
 from app.models.entities import User, Deal, DealMessage
-from api.dependencies.auth import get_current_user_ws
+from api.dependencies.auth import get_current_user_ws, get_current_user
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -263,7 +263,7 @@ async def get_deal_messages(
     deal_id: int,
     skip: int = 0,
     limit: int = 50,
-    current_user: User = Depends(get_current_user_ws),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """
@@ -315,7 +315,7 @@ async def get_deal_messages(
 @router.get("/deals/{deal_id}/unread-count")
 async def get_unread_count(
     deal_id: int,
-    current_user: User = Depends(get_current_user_ws),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
     """Get count of unread messages in a deal."""
