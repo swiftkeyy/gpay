@@ -13,7 +13,7 @@ from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db_session
 from app.models.entities import (
-    User, Admin, Seller, Lot, Deal, DealDispute, Withdrawal, Order
+    User, Admin, Seller, Lot, Deal, DealDispute, SellerWithdrawal, Order
 )
 from app.models.enums import DealStatus
 
@@ -77,7 +77,7 @@ async def get_dashboard(
     
     # Pending withdrawals
     result = await session.execute(
-        select(func.count(Withdrawal.id)).where(Withdrawal.status == "pending")
+        select(func.count(SellerWithdrawal.id)).where(SellerWithdrawal.status == "pending")
     )
     pending_withdrawals = result.scalar() or 0
     
@@ -432,22 +432,22 @@ async def get_withdrawals(
     
     offset = (page - 1) * limit
     
-    query = select(Withdrawal).options(
-        selectinload(Withdrawal.seller).selectinload(Seller.user)
+    query = select(SellerWithdrawal).options(
+        selectinload(SellerWithdrawal.seller).selectinload(Seller.user)
     )
     
     if status:
-        query = query.where(Withdrawal.status == status)
+        query = query.where(SellerWithdrawal.status == status)
     
-    query = query.order_by(Withdrawal.created_at.desc()).offset(offset).limit(limit)
+    query = query.order_by(SellerWithdrawal.created_at.desc()).offset(offset).limit(limit)
     
     result = await session.execute(query)
     withdrawals = result.scalars().all()
     
     # Get total count
-    count_query = select(func.count(Withdrawal.id))
+    count_query = select(func.count(SellerWithdrawal.id))
     if status:
-        count_query = count_query.where(Withdrawal.status == status)
+        count_query = count_query.where(SellerWithdrawal.status == status)
     
     result = await session.execute(count_query)
     total = result.scalar() or 0
@@ -480,7 +480,7 @@ async def approve_withdrawal(
     await require_admin(user_id, session)
     
     result = await session.execute(
-        select(Withdrawal).where(Withdrawal.id == withdrawal_id)
+        select(SellerWithdrawal).where(SellerWithdrawal.id == withdrawal_id)
     )
     withdrawal = result.scalar_one_or_none()
     
@@ -507,7 +507,7 @@ async def reject_withdrawal(
     await require_admin(user_id, session)
     
     result = await session.execute(
-        select(Withdrawal).where(Withdrawal.id == withdrawal_id)
+        select(SellerWithdrawal).where(SellerWithdrawal.id == withdrawal_id)
     )
     withdrawal = result.scalar_one_or_none()
     

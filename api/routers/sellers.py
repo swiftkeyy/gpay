@@ -279,10 +279,10 @@ async def get_seller_dashboard(
     
     # Pending withdrawals
     result = await db.execute(
-        select(func.coalesce(func.sum(Withdrawal.amount), 0)).where(
+        select(func.coalesce(func.sum(SellerWithdrawal.amount), 0)).where(
             and_(
-                Withdrawal.seller_id == seller.id,
-                Withdrawal.status == 'pending'
+                SellerWithdrawal.seller_id == seller.id,
+                SellerWithdrawal.status == 'pending'
             )
         )
     )
@@ -678,7 +678,9 @@ async def request_withdrawal(
     seller.balance -= request.amount
     
     # Create withdrawal
-    withdrawal = Withdrawal(
+    from app.models.entities import SellerWithdrawal
+    
+    withdrawal = SellerWithdrawal(
         seller_id=seller.id,
         amount=request.amount,
         payment_method=request.payment_method,
@@ -708,6 +710,8 @@ async def get_withdrawals(
     db: AsyncSession = Depends(get_db)
 ):
     """Get withdrawal history."""
+    from app.models.entities import SellerWithdrawal
+    
     result = await db.execute(
         select(Seller).where(Seller.user_id == current_user.id)
     )
@@ -720,9 +724,9 @@ async def get_withdrawals(
         )
     
     result = await db.execute(
-        select(Withdrawal)
-        .where(Withdrawal.seller_id == seller.id)
-        .order_by(Withdrawal.created_at.desc())
+        select(SellerWithdrawal)
+        .where(SellerWithdrawal.seller_id == seller.id)
+        .order_by(SellerWithdrawal.created_at.desc())
         .offset(skip)
         .limit(limit)
     )
