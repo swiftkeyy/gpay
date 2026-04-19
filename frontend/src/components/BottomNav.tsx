@@ -1,10 +1,8 @@
 import { Link, useLocation } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 import { useCartStore } from '../store/cartStore'
 import { useAuthStore } from '../store/authStore'
 
 export default function BottomNav() {
-  const { t } = useTranslation()
   const location = useLocation()
   const { items } = useCartStore()
   const { user } = useAuthStore()
