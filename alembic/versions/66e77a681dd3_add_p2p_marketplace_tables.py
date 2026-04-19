@@ -18,6 +18,17 @@ depends_on = None
 
 
 def upgrade() -> None:
+    # Create ENUM types first
+    op.execute("CREATE TYPE seller_status_enum AS ENUM ('pending', 'active', 'suspended', 'banned')")
+    op.execute("CREATE TYPE lot_delivery_type_enum AS ENUM ('manual', 'auto', 'instant')")
+    op.execute("CREATE TYPE lot_status_enum AS ENUM ('draft', 'active', 'out_of_stock', 'suspended', 'deleted')")
+    op.execute("CREATE TYPE deal_status_enum AS ENUM ('created', 'paid', 'in_progress', 'waiting_confirmation', 'completed', 'disputed', 'canceled', 'refunded')")
+    op.execute("CREATE TYPE dispute_status_enum AS ENUM ('open', 'investigating', 'resolved', 'closed')")
+    op.execute("CREATE TYPE transaction_type_enum AS ENUM ('deposit', 'withdrawal', 'purchase', 'refund', 'commission', 'payout', 'bonus', 'penalty')")
+    op.execute("CREATE TYPE transaction_status_enum AS ENUM ('pending', 'completed', 'failed', 'canceled')")
+    op.execute("CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'failed', 'canceled')")
+    op.execute("CREATE TYPE notification_type_enum AS ENUM ('order', 'deal', 'payment', 'review', 'system', 'promo')")
+    
     # Create sellers table
     op.create_table('sellers',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -39,7 +50,6 @@ def upgrade() -> None:
         sa.UniqueConstraint('user_id', name='uq_sellers_user_id')
     )
     op.create_index('ix_sellers_status_rating', 'sellers', ['status', 'rating'])
-    op.execute("ALTER TABLE sellers ADD CONSTRAINT ck_sellers_status CHECK (status::text = ANY (ARRAY['pending'::text, 'active'::text, 'suspended'::text, 'banned'::text]))")
     
     # Create lots table
     op.create_table('lots',
@@ -67,8 +77,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_lots_product_seller_status', 'lots', ['product_id', 'seller_id', 'status'])
     op.create_index('ix_lots_status_price', 'lots', ['status', 'price'])
-    op.execute("ALTER TABLE lots ADD CONSTRAINT ck_lots_delivery_type CHECK (delivery_type::text = ANY (ARRAY['manual'::text, 'auto'::text, 'instant'::text]))")
-    op.execute("ALTER TABLE lots ADD CONSTRAINT ck_lots_status CHECK (status::text = ANY (ARRAY['draft'::text, 'active'::text, 'out_of_stock'::text, 'suspended'::text, 'deleted'::text]))")
     
     # Create deals table
     op.create_table('deals',
@@ -98,7 +106,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_deals_buyer_status', 'deals', ['buyer_id', 'status'])
     op.create_index('ix_deals_seller_status', 'deals', ['seller_id', 'status'])
-    op.execute("ALTER TABLE deals ADD CONSTRAINT ck_deals_status CHECK (status::text = ANY (ARRAY['created'::text, 'paid'::text, 'in_progress'::text, 'waiting_confirmation'::text, 'completed'::text, 'disputed'::text, 'canceled'::text, 'refunded'::text]))")
     
     # Create lot_stock_items table
     op.create_table('lot_stock_items',
@@ -154,7 +161,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id'),
         sa.UniqueConstraint('deal_id', name='uq_deal_disputes_deal_id')
     )
-    op.execute("ALTER TABLE deal_disputes ADD CONSTRAINT ck_deal_disputes_status CHECK (status::text = ANY (ARRAY['open'::text, 'investigating'::text, 'resolved'::text, 'closed'::text]))")
     
     # Create transactions table
     op.create_table('transactions',
@@ -176,8 +182,6 @@ def upgrade() -> None:
     )
     op.create_index('ix_transactions_user_type_created', 'transactions', ['user_id', 'transaction_type', 'created_at'])
     op.create_index('ix_transactions_status', 'transactions', ['status'])
-    op.execute("ALTER TABLE transactions ADD CONSTRAINT ck_transactions_transaction_type CHECK (transaction_type::text = ANY (ARRAY['deposit'::text, 'withdrawal'::text, 'purchase'::text, 'refund'::text, 'commission'::text, 'payout'::text, 'bonus'::text, 'penalty'::text]))")
-    op.execute("ALTER TABLE transactions ADD CONSTRAINT ck_transactions_status CHECK (status::text = ANY (ARRAY['pending'::text, 'completed'::text, 'failed'::text, 'canceled'::text]))")
     
     # Create seller_withdrawals table
     op.create_table('seller_withdrawals',
@@ -198,7 +202,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_seller_withdrawals_seller_status', 'seller_withdrawals', ['seller_id', 'status'])
-    op.execute("ALTER TABLE seller_withdrawals ADD CONSTRAINT ck_seller_withdrawals_status CHECK (status::text = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text, 'canceled'::text]))")
     
     # Create seller_reviews table
     op.create_table('seller_reviews',
@@ -220,7 +223,6 @@ def upgrade() -> None:
         sa.CheckConstraint('rating >= 1 AND rating <= 5', name='ck_seller_reviews_rating_range')
     )
     op.create_index('ix_seller_reviews_seller_status', 'seller_reviews', ['seller_id', 'status'])
-    op.execute("ALTER TABLE seller_reviews ADD CONSTRAINT ck_seller_reviews_status CHECK (status::text = ANY (ARRAY['hidden'::text, 'published'::text, 'rejected'::text]))")
     
     # Create favorites table
     op.create_table('favorites',
@@ -251,7 +253,6 @@ def upgrade() -> None:
         sa.PrimaryKeyConstraint('id')
     )
     op.create_index('ix_notifications_user_read_created', 'notifications', ['user_id', 'is_read', 'created_at'])
-    op.execute("ALTER TABLE notifications ADD CONSTRAINT ck_notifications_notification_type CHECK (notification_type::text = ANY (ARRAY['order'::text, 'deal'::text, 'payment'::text, 'review'::text, 'system'::text, 'promo'::text]))")
 
 
 def downgrade() -> None:
@@ -267,3 +268,14 @@ def downgrade() -> None:
     op.drop_table('deals')
     op.drop_table('lots')
     op.drop_table('sellers')
+    
+    # Drop ENUM types
+    op.execute("DROP TYPE IF EXISTS notification_type_enum")
+    op.execute("DROP TYPE IF EXISTS withdrawal_status_enum")
+    op.execute("DROP TYPE IF EXISTS transaction_status_enum")
+    op.execute("DROP TYPE IF EXISTS transaction_type_enum")
+    op.execute("DROP TYPE IF EXISTS dispute_status_enum")
+    op.execute("DROP TYPE IF EXISTS deal_status_enum")
+    op.execute("DROP TYPE IF EXISTS lot_status_enum")
+    op.execute("DROP TYPE IF EXISTS lot_delivery_type_enum")
+    op.execute("DROP TYPE IF EXISTS seller_status_enum")
