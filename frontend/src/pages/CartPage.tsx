@@ -74,47 +74,58 @@ export default function CartPage() {
   }
 
   return (
-    <div className="min-h-screen pb-32">
+    <div className="min-h-screen pb-32 bg-cyber-dark relative overflow-hidden">
+      {/* Animated Background Grid */}
+      <div className="fixed inset-0 opacity-10 pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(255, 0, 51, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 51, 0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px'
+        }} />
+      </div>
+
       {/* Header */}
-      <div className="sticky top-0 bg-tg-bg border-b border-gray-200 p-4 z-10">
+      <div className="sticky top-0 backdrop-blur-xl bg-cyber-dark/90 border-b border-neon-red/30 shadow-neon-red p-4 z-10 transition-all duration-300">
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate(-1)} className="text-tg-link text-xl">
+          <button onClick={() => navigate(-1)} className="text-neon-cyan text-2xl hover:text-neon-red transition-all duration-200 hover:scale-110">
             ←
           </button>
-          <h1 className="text-2xl font-bold">🛒 {t('nav.cart')}</h1>
+          <h1 className="text-2xl font-black font-gaming text-neon-red drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]">🛒 {t('nav.cart')}</h1>
         </div>
       </div>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20">
-          <div className="text-6xl mb-4">🛒</div>
-          <p className="text-gray-500 mb-6">{t('cart.empty')}</p>
+        <div className="flex flex-col items-center justify-center py-20 relative z-10">
+          <div className="text-8xl mb-4 animate-float">🛒</div>
+          <p className="text-gray-400 mb-6 font-gaming text-lg">{t('cart.empty')}</p>
           <Link
             to="/"
-            className="bg-tg-button text-tg-button-text px-6 py-3 rounded-lg font-semibold"
+            className="bg-gradient-to-r from-neon-red to-neon-purple text-white px-8 py-4 rounded-xl font-gaming font-black tracking-wide shadow-neon-red hover:shadow-neon-purple hover:scale-105 transition-all duration-300"
           >
             {t('cart.continueShopping')}
           </Link>
         </div>
       ) : (
         <>
-          <div className="p-4">
+          <div className="p-4 relative z-10">
             {/* Cart Items */}
-            <div className="space-y-3 mb-6">
+            <div className="space-y-4 mb-6">
               {items.map((item) => (
-                <div key={item.id} className="border border-gray-200 rounded-lg p-4 bg-white">
+                <div key={item.id} className="relative overflow-hidden rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-red/30 hover:border-neon-red hover:shadow-neon-red-lg transition-all duration-300 hover:scale-[1.02] p-4">
                   <div className="flex gap-3">
                     {/* Image */}
-                    <Link to={`/product/${item.lot_id}`} className="flex-shrink-0">
-                      <div className="w-20 h-20 bg-gray-100 rounded flex items-center justify-center">
+                    <Link to={`/product/${item.lot_id}`} className="flex-shrink-0 group">
+                      <div className="w-24 h-24 bg-gradient-to-br from-neon-red/20 to-neon-purple/20 rounded-lg flex items-center justify-center overflow-hidden border-2 border-neon-cyan/30 transition-all duration-300 group-hover:border-neon-cyan group-hover:scale-105">
                         {item.lot_image ? (
                           <img 
                             src={item.lot_image} 
                             alt={item.lot_title} 
-                            className="w-full h-full object-cover rounded"
+                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                           />
                         ) : (
-                          <span className="text-2xl">🎮</span>
+                          <span className="text-4xl">🎮</span>
                         )}
                       </div>
                     </Link>
@@ -122,9 +133,9 @@ export default function CartPage() {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <Link to={`/product/${item.lot_id}`}>
-                        <h3 className="font-semibold mb-1 line-clamp-2">{item.lot_title}</h3>
+                        <h3 className="font-gaming font-bold text-white mb-1 line-clamp-2 hover:text-neon-cyan transition-colors duration-200">{item.lot_title}</h3>
                       </Link>
-                      <div className="text-lg font-bold text-tg-button mb-2">
+                      <div className="text-xl font-black font-gaming text-neon-red drop-shadow-[0_0_10px_rgba(255,0,51,0.8)] mb-3">
                         {item.lot_price} ₽
                       </div>
 
@@ -133,14 +144,14 @@ export default function CartPage() {
                         <button
                           onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)}
                           disabled={item.quantity <= 1}
-                          className="w-8 h-8 border border-gray-300 rounded-lg font-bold disabled:opacity-30"
+                          className="w-10 h-10 bg-black/60 border-2 border-neon-purple/50 rounded-lg font-gaming font-black text-white hover:border-neon-purple hover:shadow-neon-purple disabled:opacity-30 transition-all duration-200 hover:scale-110"
                         >
                           -
                         </button>
-                        <span className="w-12 text-center font-medium">{item.quantity}</span>
+                        <span className="w-12 text-center font-gaming font-bold text-neon-cyan text-lg">{item.quantity}</span>
                         <button
                           onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)}
-                          className="w-8 h-8 border border-gray-300 rounded-lg font-bold"
+                          className="w-10 h-10 bg-black/60 border-2 border-neon-purple/50 rounded-lg font-gaming font-black text-white hover:border-neon-purple hover:shadow-neon-purple transition-all duration-200 hover:scale-110"
                         >
                           +
                         </button>
@@ -150,42 +161,42 @@ export default function CartPage() {
                     {/* Remove Button */}
                     <button
                       onClick={() => handleRemoveItem(item.id)}
-                      className="text-red-500 text-xl self-start"
+                      className="text-neon-red text-2xl self-start hover:text-white hover:scale-125 transition-all duration-200"
                     >
                       ✕
                     </button>
                   </div>
 
                   {/* Item Total */}
-                  <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
-                    <span className="text-sm text-gray-600">{t('cart.itemTotal')}</span>
-                    <span className="font-bold">{(item.lot_price * item.quantity).toFixed(2)} ₽</span>
+                  <div className="mt-3 pt-3 border-t border-neon-red/30 flex justify-between items-center">
+                    <span className="text-sm text-neon-cyan font-gaming">{t('cart.itemTotal')}</span>
+                    <span className="font-gaming font-black text-neon-gold text-lg">{(item.lot_price * item.quantity).toFixed(2)} ₽</span>
                   </div>
                 </div>
               ))}
             </div>
 
             {/* Promo Code */}
-            <div className="border border-gray-200 rounded-lg p-4 mb-6 bg-white">
-              <h3 className="font-semibold mb-3">{t('cart.promoCode')}</h3>
+            <div className="relative overflow-hidden rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-purple/30 p-4 mb-6 hover:border-neon-purple hover:shadow-neon-purple transition-all duration-300">
+              <h3 className="font-gaming font-bold text-neon-cyan mb-3 tracking-wide">🎁 {t('cart.promoCode')}</h3>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={promoCode}
                   onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
                   placeholder={t('cart.enterPromoCode')}
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-4 py-3 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white placeholder-gray-400 font-gaming focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all duration-200"
                 />
                 <button
                   onClick={handleApplyPromo}
                   disabled={!promoCode.trim() || applyingPromo}
-                  className="px-6 py-2 bg-tg-button text-tg-button-text rounded-lg font-semibold disabled:opacity-50"
+                  className="px-6 py-3 bg-gradient-to-r from-neon-purple to-neon-cyan text-white rounded-lg font-gaming font-black disabled:opacity-50 hover:scale-105 transition-all duration-200 shadow-neon-purple"
                 >
                   {applyingPromo ? '...' : t('cart.apply')}
                 </button>
               </div>
               {discount > 0 && (
-                <div className="mt-2 text-green-600 text-sm">
+                <div className="mt-3 text-green-400 text-sm font-gaming animate-fade-in">
                   ✓ {t('cart.discountApplied')}: -{discount.toFixed(2)} ₽
                 </div>
               )}
@@ -193,26 +204,26 @@ export default function CartPage() {
           </div>
 
           {/* Bottom Summary */}
-          <div className="fixed bottom-16 left-0 right-0 bg-tg-bg border-t border-gray-200 p-4">
+          <div className="fixed bottom-16 left-0 right-0 backdrop-blur-xl bg-cyber-dark/95 border-t-2 border-neon-red/30 shadow-neon-red p-4 transition-all duration-300">
             <div className="space-y-2 mb-4">
               <div className="flex justify-between text-sm">
-                <span className="text-gray-600">{t('cart.subtotal')}</span>
-                <span className="font-medium">{total.toFixed(2)} ₽</span>
+                <span className="text-gray-400 font-gaming">{t('cart.subtotal')}</span>
+                <span className="font-gaming font-bold text-white">{total.toFixed(2)} ₽</span>
               </div>
               {discount > 0 && (
-                <div className="flex justify-between text-sm text-green-600">
-                  <span>{t('cart.discount')}</span>
-                  <span className="font-medium">-{discount.toFixed(2)} ₽</span>
+                <div className="flex justify-between text-sm text-green-400">
+                  <span className="font-gaming">{t('cart.discount')}</span>
+                  <span className="font-gaming font-bold">-{discount.toFixed(2)} ₽</span>
                 </div>
               )}
-              <div className="flex justify-between text-lg font-bold pt-2 border-t border-gray-200">
-                <span>{t('cart.total')}</span>
-                <span className="text-tg-button">{finalTotal.toFixed(2)} ₽</span>
+              <div className="flex justify-between text-xl font-black pt-2 border-t border-neon-red/30">
+                <span className="font-gaming text-neon-cyan">{t('cart.total')}</span>
+                <span className="font-gaming text-neon-red drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]">{finalTotal.toFixed(2)} ₽</span>
               </div>
             </div>
             <button
               onClick={() => navigate('/checkout')}
-              className="w-full bg-tg-button text-tg-button-text py-3 rounded-lg font-semibold"
+              className="w-full bg-gradient-to-r from-neon-red to-neon-purple text-white py-4 rounded-xl font-gaming font-black tracking-wide shadow-neon-red hover:shadow-neon-purple hover:scale-105 transition-all duration-300"
             >
               {t('cart.checkout')}
             </button>

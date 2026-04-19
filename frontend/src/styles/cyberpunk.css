@@ -1,5 +1,25 @@
 /* Cyberpunk Gaming Styles */
 
+/* Smooth 120fps animations */
+* {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  will-change: transform;
+}
+
+/* Ultra-smooth transitions */
+button, a, input, select, .transition-all {
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 200ms;
+}
+
+/* Hover effects with GPU acceleration */
+button:hover, a:hover, .hover\:scale-105:hover, .hover\:scale-110:hover, .hover\:scale-\[1\.02\]:hover {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
 /* Text Glow Effects */
 .text-glow-red {
   text-shadow: 0 0 10px rgba(255, 0, 51, 0.8),
