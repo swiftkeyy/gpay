@@ -253,25 +253,56 @@ async def get_lot(
     lot_id: int,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get lot details."""
-    result = await session.execute(select(Lot).where(Lot.id == lot_id))
-    lot = result.scalar_one_or_none()
+    """Get lot details (using Product as lot)."""
+    import logging
+    logger = logging.getLogger(__name__)
     
-    if not lot:
+    # Get product (we're using products as lots)
+    result = await session.execute(
+        select(Product).where(Product.id == lot_id, Product.is_active == True)
+    )
+    product = result.scalar_one_or_none()
+    
+    if not product:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Lot not found")
     
-    return LotResponse(
-        id=lot.id,
-        title=lot.title,
-        description=lot.description,
-        price=float(lot.price),
-        currency_code=lot.currency_code,
-        seller_id=lot.seller_id,
-        delivery_type=lot.delivery_type.value,
-        stock_count=lot.stock_count,
-        status=lot.status.value
+    # Get active price
+    price_result = await session.execute(
+        select(Price).where(
+            Price.product_id == product.id,
+            Price.is_active == True
+        ).limit(1)
     )
+    price = price_result.scalar_one_or_none()
+    
+    if not price:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Price not found for this product")
+    
+    # Generate temporary image URLs
+    image_urls = [
+        f"https://picsum.photos/seed/{product.id}-1/400/400",
+        f"https://picsum.photos/seed/{product.id}-2/400/400",
+        f"https://picsum.photos/seed/{product.id}-3/400/400",
+    ]
+    
+    return {
+        "id": product.id,
+        "title": product.title or "Без названия",
+        "description": product.description or "",
+        "price": float(price.base_price) if price.base_price else 0.0,
+        "currency_code": price.currency_code or "RUB",
+        "images": image_urls,
+        "seller_name": "Game Pay",
+        "seller_id": 1,
+        "seller_rating": 5.0,
+        "rating": 5.0,
+        "delivery_type": "manual",
+        "stock_count": 999,
+        "is_featured": product.is_featured or False,
+        "status": "active"
+    }
 
 
 @router.post("/lots/{lot_id}/favorite")
@@ -321,3 +352,63 @@ async def remove_from_favorites(
     await session.commit()
     
     return {"message": "Removed from favorites"}
+
+
+@router.get("/lots/{lot_id}/reviews")
+async def get_lot_reviews(
+    lot_id: int,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Get reviews for a lot (product)."""
+    from app.models.entities import Review
+    
+    # Check if product exists
+    result = await session.execute(
+        select(Product).where(Product.id == lot_id, Product.is_active == True)
+    )
+    product = result.scalar_one_or_none()
+    
+    if not product:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Lot not found")
+    
+    # Get reviews for this product
+    offset = (page - 1) * limit
+    
+    result = await session.execute(
+        select(Review)
+        .where(Review.product_id == lot_id, Review.status == "published")
+        .order_by(Review.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    reviews = result.scalars().all()
+    
+    # Get total count
+    from sqlalchemy import func
+    result = await session.execute(
+        select(func.count(Review.id)).where(
+            Review.product_id == lot_id,
+            Review.status == "published"
+        )
+    )
+    total = result.scalar() or 0
+    
+    return {
+        "items": [
+            {
+                "id": review.id,
+                "user_id": review.user_id,
+                "rating": review.rating,
+                "text": review.text,
+                "created_at": review.created_at.isoformat()
+            }
+            for review in reviews
+        ],
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "average_rating": 5.0  # TODO: Calculate real average
+    }

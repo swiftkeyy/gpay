@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import get_settings
-from api.routers import auth, users, catalog, orders, deals, sellers, reviews, admin, payments, notifications, chat
+from api.routers import auth, users, catalog, orders, deals, sellers, reviews, admin, payments, notifications, chat, cart
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
@@ -78,6 +78,7 @@ async def global_exception_handler(request, exc):
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
 app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(catalog.router, prefix="/api/v1", tags=["Catalog"])
+app.include_router(cart.router, prefix="/api/v1/cart", tags=["Cart"])
 app.include_router(orders.router, prefix="/api/v1/orders", tags=["Orders"])
 app.include_router(deals.router, prefix="/api/v1/deals", tags=["Deals"])
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat"])
