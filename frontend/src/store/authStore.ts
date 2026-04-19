@@ -38,10 +38,17 @@ export const useAuthStore = create<AuthState>()(
       initAuth: async () => {
         try {
           set({ isLoading: true, error: null })
+          
+          console.log('WebApp object:', WebApp)
+          console.log('WebApp.initData:', WebApp.initData)
+          console.log('WebApp.initDataUnsafe:', WebApp.initDataUnsafe)
+          
           const initData = WebApp.initData
           
           if (!initData) {
             console.error('No initData from Telegram')
+            console.log('Platform:', WebApp.platform)
+            console.log('Version:', WebApp.version)
             set({ isLoading: false, error: 'No Telegram data' })
             return
           }
