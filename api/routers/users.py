@@ -34,13 +34,27 @@ async def get_current_user(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Get current user profile."""
+    from sqlalchemy import select
+    from app.models import Admin, Seller
+    
     user_repo = UserRepository(session)
     user = await user_repo.get_by_id(user_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # TODO: Check if user is admin or seller from respective tables
+    # Check if user is admin
+    result = await session.execute(
+        select(Admin).where(Admin.user_id == user_id)
+    )
+    is_admin = result.scalar_one_or_none() is not None
+    
+    # Check if user is seller
+    result = await session.execute(
+        select(Seller).where(Seller.user_id == user_id)
+    )
+    is_seller = result.scalar_one_or_none() is not None
+    
     return UserProfileResponse(
         id=user.id,
         telegram_id=user.telegram_id,
@@ -49,8 +63,8 @@ async def get_current_user(
         balance=float(user.balance),
         referral_code=user.referral_code,
         language_code=user.language_code or "ru",
-        is_admin=False,  # TODO: Check admins table
-        is_seller=False,  # TODO: Check sellers table
+        is_admin=is_admin,
+        is_seller=is_seller,
         created_at=user.created_at.isoformat()
     )
 
@@ -62,6 +76,9 @@ async def update_current_user(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Update current user profile."""
+    from sqlalchemy import select
+    from app.models import Admin, Seller
+    
     user_repo = UserRepository(session)
     user = await user_repo.get_by_id(user_id)
     
@@ -74,6 +91,18 @@ async def update_current_user(
     await session.commit()
     await session.refresh(user)
     
+    # Check if user is admin
+    result = await session.execute(
+        select(Admin).where(Admin.user_id == user_id)
+    )
+    is_admin = result.scalar_one_or_none() is not None
+    
+    # Check if user is seller
+    result = await session.execute(
+        select(Seller).where(Seller.user_id == user_id)
+    )
+    is_seller = result.scalar_one_or_none() is not None
+    
     return UserProfileResponse(
         id=user.id,
         telegram_id=user.telegram_id,
@@ -82,8 +111,8 @@ async def update_current_user(
         balance=float(user.balance),
         referral_code=user.referral_code,
         language_code=user.language_code or "ru",
-        is_admin=False,  # TODO: Check admins table
-        is_seller=False,  # TODO: Check sellers table
+        is_admin=is_admin,
+        is_seller=is_seller,
         created_at=user.created_at.isoformat()
     )
 
@@ -111,10 +140,44 @@ async def get_transactions(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Get user transaction history."""
-    # TODO: Implement transaction repository
+    from sqlalchemy import select, func
+    from app.models import Transaction
+    
+    if limit > 100:
+        limit = 100
+    
+    offset = (page - 1) * limit
+    
+    # Get transactions
+    result = await session.execute(
+        select(Transaction)
+        .where(Transaction.user_id == user_id)
+        .order_by(Transaction.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    transactions = result.scalars().all()
+    
+    # Get total count
+    result = await session.execute(
+        select(func.count(Transaction.id)).where(Transaction.user_id == user_id)
+    )
+    total = result.scalar() or 0
+    
     return {
-        "items": [],
-        "total": 0,
+        "items": [
+            {
+                "id": tx.id,
+                "type": tx.transaction_type.value,
+                "amount": float(tx.amount),
+                "currency": tx.currency_code,
+                "status": tx.status.value,
+                "description": tx.description,
+                "created_at": tx.created_at.isoformat()
+            }
+            for tx in transactions
+        ],
+        "total": total,
         "page": page,
         "limit": limit
     }
@@ -126,15 +189,35 @@ async def get_referrals(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Get referral stats."""
+    from sqlalchemy import select, func
+    from app.models import User
+    
     user_repo = UserRepository(session)
     user = await user_repo.get_by_id(user_id)
     
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # TODO: Implement referral repository to get real stats
+    # Get total referrals count
+    result = await session.execute(
+        select(func.count(User.id)).where(User.referred_by_id == user_id)
+    )
+    total_referrals = result.scalar() or 0
+    
+    # Get total earned from referrals (from transactions)
+    from app.models import Transaction
+    from app.models.enums import TransactionType
+    
+    result = await session.execute(
+        select(func.coalesce(func.sum(Transaction.amount), 0)).where(
+            Transaction.user_id == user_id,
+            Transaction.transaction_type == TransactionType.REFERRAL_REWARD
+        )
+    )
+    total_earned = float(result.scalar() or 0)
+    
     return {
         "referral_code": user.referral_code,
-        "total_referrals": 0,
-        "total_earned": 0.00
+        "total_referrals": total_referrals,
+        "total_earned": total_earned
     }

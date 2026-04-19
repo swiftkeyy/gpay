@@ -288,11 +288,23 @@ async def get_seller_dashboard(
     )
     pending_withdrawals = result.scalar()
     
+    # Calculate in_escrow from active deals
+    result = await db.execute(
+        select(func.coalesce(func.sum(Deal.seller_amount), 0)).where(
+            and_(
+                Deal.seller_id == seller.id,
+                Deal.status.in_(['paid', 'in_progress', 'waiting_confirmation']),
+                Deal.escrow_released == False
+            )
+        )
+    )
+    in_escrow = result.scalar()
+    
     return {
         "balance": {
             "available": float(seller.balance),
             "pending_withdrawals": float(pending_withdrawals),
-            "in_escrow": 0.00  # TODO: calculate from active deals
+            "in_escrow": float(in_escrow)
         },
         "today": {
             "sales": today_stats.sales,
