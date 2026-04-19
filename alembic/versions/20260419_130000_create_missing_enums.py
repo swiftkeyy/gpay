@@ -22,15 +22,15 @@ def upgrade():
     DO $$ 
     BEGIN
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lot_status_enum') THEN
-            CREATE TYPE lot_status_enum AS ENUM ('draft', 'active', 'paused', 'out_of_stock', 'sold', 'deleted', 'suspended');
+            CREATE TYPE lot_status_enum AS ENUM ('draft', 'active', 'paused', 'out_of_stock', 'deleted');
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'lot_delivery_type_enum') THEN
-            CREATE TYPE lot_delivery_type_enum AS ENUM ('auto', 'instant', 'manual');
+            CREATE TYPE lot_delivery_type_enum AS ENUM ('auto', 'manual', 'coordinates');
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'deal_status_enum') THEN
-            CREATE TYPE deal_status_enum AS ENUM ('created', 'paid', 'in_progress', 'waiting_confirmation', 'completed', 'disputed', 'canceled', 'refunded');
+            CREATE TYPE deal_status_enum AS ENUM ('created', 'paid', 'in_progress', 'waiting_confirmation', 'completed', 'canceled', 'dispute', 'refunded');
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'seller_status_enum') THEN
@@ -38,11 +38,11 @@ def upgrade():
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'dispute_status_enum') THEN
-            CREATE TYPE dispute_status_enum AS ENUM ('open', 'investigating', 'resolved', 'closed');
+            CREATE TYPE dispute_status_enum AS ENUM ('open', 'in_review', 'resolved', 'closed');
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transaction_type_enum') THEN
-            CREATE TYPE transaction_type_enum AS ENUM ('deposit', 'withdrawal', 'purchase', 'refund', 'commission', 'payout', 'bonus', 'penalty');
+            CREATE TYPE transaction_type_enum AS ENUM ('deposit', 'purchase', 'sale', 'refund', 'withdrawal', 'commission', 'bonus', 'penalty');
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'transaction_status_enum') THEN
@@ -50,11 +50,11 @@ def upgrade():
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'withdrawal_status_enum') THEN
-            CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'failed', 'canceled');
+            CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'rejected', 'canceled');
         END IF;
         
         IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'notification_type_enum') THEN
-            CREATE TYPE notification_type_enum AS ENUM ('order', 'deal', 'payment', 'review', 'system', 'promo');
+            CREATE TYPE notification_type_enum AS ENUM ('new_message', 'new_order', 'order_status', 'payment', 'review', 'system', 'price_alert');
         END IF;
     END
     $$;
