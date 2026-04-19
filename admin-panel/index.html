@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GamePay Admin Panel</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .tab-button.active { background-color: #3b82f6; color: white; }
+    </style>
+</head>
+<body class="bg-gray-100">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow">
+            <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+                <h1 class="text-2xl font-bold text-gray-900">GamePay Admin Panel</h1>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            <!-- Tabs -->
+            <div class="mb-6 border-b border-gray-200">
+                <nav class="flex space-x-4">
+                    <button onclick="showTab('dashboard')" class="tab-button active px-4 py-2 rounded-t-lg">Dashboard</button>
+                    <button onclick="showTab('users')" class="tab-button px-4 py-2 rounded-t-lg">Users</button>
+                    <button onclick="showTab('sellers')" class="tab-button px-4 py-2 rounded-t-lg">Sellers</button>
+                    <button onclick="showTab('lots')" class="tab-button px-4 py-2 rounded-t-lg">Lots</button>
+                    <button onclick="showTab('disputes')" class="tab-button px-4 py-2 rounded-t-lg">Disputes</button>
+                    <button onclick="showTab('withdrawals')" class="tab-button px-4 py-2 rounded-t-lg">Withdrawals</button>
+                </nav>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-gray-500 text-sm font-medium">Total Users</h3>
+                        <p id="total-users" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-gray-500 text-sm font-medium">Total Sellers</h3>
+                        <p id="total-sellers" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-gray-500 text-sm font-medium">Active Lots</h3>
+                        <p id="active-lots" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-gray-500 text-sm font-medium">Completed Deals</h3>
+                        <p id="completed-deals" class="text-3xl font-bold text-gray-900">-</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-gray-500 text-sm font-medium">Open Disputes</h3>
+                        <p id="open-disputes" class="text-3xl font-bold text-red-600">-</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-lg shadow">
+                        <h3 class="text-gray-500 text-sm font-medium">Total Revenue</h3>
+                        <p id="total-revenue" class="text-3xl font-bold text-green-600">-</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Users Tab -->
+            <div id="users" class="tab-content">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="p-4 border-b">
+                        <input type="text" id="users-search" placeholder="Search users..." 
+                               class="w-full px-4 py-2 border rounded-lg" onkeyup="searchUsers()">
+                    </div>
+                    <div id="users-list" class="divide-y"></div>
+                    <div class="p-4 border-t">
+                        <button onclick="loadUsers()" class="px-4 py-2 bg-blue-500 text-white rounded-lg">Refresh</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sellers Tab -->
+            <div id="sellers" class="tab-content">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="p-4 border-b flex space-x-2">
+                        <button onclick="loadSellers('pending')" class="px-4 py-2 bg-yellow-500 text-white rounded-lg">Pending</button>
+                        <button onclick="loadSellers('active')" class="px-4 py-2 bg-green-500 text-white rounded-lg">Active</button>
+                        <button onclick="loadSellers()" class="px-4 py-2 bg-gray-500 text-white rounded-lg">All</button>
+                    </div>
+                    <div id="sellers-list" class="divide-y"></div>
+                </div>
+            </div>
+
+            <!-- Lots Tab -->
+            <div id="lots" class="tab-content">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="p-4 border-b flex space-x-2">
+                        <button onclick="loadLots('pending')" class="px-4 py-2 bg-yellow-500 text-white rounded-lg">Pending</button>
+                        <button onclick="loadLots('active')" class="px-4 py-2 bg-green-500 text-white rounded-lg">Active</button>
+                        <button onclick="loadLots()" class="px-4 py-2 bg-gray-500 text-white rounded-lg">All</button>
+                    </div>
+                    <div id="lots-list" class="divide-y"></div>
+                </div>
+            </div>
+
+            <!-- Disputes Tab -->
+            <div id="disputes" class="tab-content">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div id="disputes-list" class="divide-y"></div>
+                    <div class="p-4 border-t">
+                        <button onclick="loadDisputes()" class="px-4 py-2 bg-blue-500 text-white rounded-lg">Refresh</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Withdrawals Tab -->
+            <div id="withdrawals" class="tab-content">
+                <div class="bg-white rounded-lg shadow overflow-hidden">
+                    <div class="p-4 border-b flex space-x-2">
+                        <button onclick="loadWithdrawals('pending')" class="px-4 py-2 bg-yellow-500 text-white rounded-lg">Pending</button>
+                        <button onclick="loadWithdrawals('completed')" class="px-4 py-2 bg-green-500 text-white rounded-lg">Completed</button>
+                        <button onclick="loadWithdrawals()" class="px-4 py-2 bg-gray-500 text-white rounded-lg">All</button>
+                    </div>
+                    <div id="withdrawals-list" class="divide-y"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const API_URL = 'https://gpay-production-5cd1.up.railway.app/api/v1';
+        const USER_ID = 1; // Admin user ID
+
+        // Tab switching
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+
+            // Load data for the tab
+            if (tabName === 'dashboard') loadDashboard();
+            else if (tabName === 'users') loadUsers();
+            else if (tabName === 'sellers') loadSellers();
+            else if (tabName === 'lots') loadLots();
+            else if (tabName === 'disputes') loadDisputes();
+            else if (tabName === 'withdrawals') loadWithdrawals();
+        }
+
+        // Dashboard
+        async function loadDashboard() {
+            try {
+                const response = await fetch(`${API_URL}/admin/dashboard?user_id=${USER_ID}`);
+                const data = await response.json();
+                
+                document.getElementById('total-users').textContent = data.users.total;
+                document.getElementById('total-sellers').textContent = data.users.sellers;
+                document.getElementById('active-lots').textContent = data.lots.active;
+                document.getElementById('completed-deals').textContent = data.deals.completed;
+                document.getElementById('open-disputes').textContent = data.disputes.open;
+                document.getElementById('total-revenue').textContent = `${data.revenue.total.toFixed(2)} ₽`;
+            } catch (error) {
+                console.error('Error loading dashboard:', error);
+            }
+        }
+
+        // Users
+        async function loadUsers(search = '') {
+            try {
+                const response = await fetch(`${API_URL}/admin/users?user_id=${USER_ID}&search=${search}`);
+                const data = await response.json();
+                
+                const list = document.getElementById('users-list');
+                list.innerHTML = data.items.map(user => `
+                    <div class="p-4 flex justify-between items-center">
+                        <div>
+                            <p class="font-medium">${user.username || 'No username'}</p>
+                            <p class="text-sm text-gray-500">ID: ${user.telegram_id} | Balance: ${user.balance} ₽</p>
+                        </div>
+                        <div class="space-x-2">
+                            ${user.is_blocked 
+                                ? `<button onclick="unblockUser(${user.id})" class="px-3 py-1 bg-green-500 text-white rounded">Unblock</button>`
+                                : `<button onclick="blockUser(${user.id})" class="px-3 py-1 bg-red-500 text-white rounded">Block</button>`
+                            }
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading users:', error);
+            }
+        }
+
+        function searchUsers() {
+            const search = document.getElementById('users-search').value;
+            loadUsers(search);
+        }
+
+        async function blockUser(userId) {
+            if (!confirm('Block this user?')) return;
+            try {
+                await fetch(`${API_URL}/admin/users/${userId}/block?user_id=${USER_ID}`, { method: 'POST' });
+                loadUsers();
+            } catch (error) {
+                console.error('Error blocking user:', error);
+            }
+        }
+
+        async function unblockUser(userId) {
+            try {
+                await fetch(`${API_URL}/admin/users/${userId}/unblock?user_id=${USER_ID}`, { method: 'POST' });
+                loadUsers();
+            } catch (error) {
+                console.error('Error unblocking user:', error);
+            }
+        }
+
+        // Sellers
+        async function loadSellers(status = '') {
+            try {
+                const response = await fetch(`${API_URL}/admin/sellers?user_id=${USER_ID}${status ? `&status=${status}` : ''}`);
+                const data = await response.json();
+                
+                const list = document.getElementById('sellers-list');
+                list.innerHTML = data.items.map(seller => `
+                    <div class="p-4 flex justify-between items-center">
+                        <div>
+                            <p class="font-medium">${seller.username || 'No username'}</p>
+                            <p class="text-sm text-gray-500">Rating: ${seller.rating} | Sales: ${seller.total_sales} | Balance: ${seller.balance} ₽</p>
+                        </div>
+                        <div class="space-x-2">
+                            ${seller.status === 'pending' 
+                                ? `<button onclick="approveSeller(${seller.id})" class="px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+                                   <button onclick="rejectSeller(${seller.id})" class="px-3 py-1 bg-red-500 text-white rounded">Reject</button>`
+                                : `<span class="px-3 py-1 bg-gray-200 rounded">${seller.status}</span>`
+                            }
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading sellers:', error);
+            }
+        }
+
+        async function approveSeller(sellerId) {
+            try {
+                await fetch(`${API_URL}/admin/sellers/${sellerId}/approve?user_id=${USER_ID}`, { method: 'POST' });
+                loadSellers();
+            } catch (error) {
+                console.error('Error approving seller:', error);
+            }
+        }
+
+        async function rejectSeller(sellerId) {
+            if (!confirm('Reject this seller?')) return;
+            try {
+                await fetch(`${API_URL}/admin/sellers/${sellerId}/reject?user_id=${USER_ID}`, { method: 'POST' });
+                loadSellers();
+            } catch (error) {
+                console.error('Error rejecting seller:', error);
+            }
+        }
+
+        // Lots
+        async function loadLots(status = '') {
+            try {
+                const response = await fetch(`${API_URL}/admin/lots?user_id=${USER_ID}${status ? `&status=${status}` : ''}`);
+                const data = await response.json();
+                
+                const list = document.getElementById('lots-list');
+                list.innerHTML = data.items.map(lot => `
+                    <div class="p-4 flex justify-between items-center">
+                        <div>
+                            <p class="font-medium">${lot.title}</p>
+                            <p class="text-sm text-gray-500">Price: ${lot.price} ₽ | Seller: ${lot.seller_name} | Stock: ${lot.stock_count}</p>
+                        </div>
+                        <div class="space-x-2">
+                            ${lot.status === 'pending' 
+                                ? `<button onclick="approveLot(${lot.id})" class="px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+                                   <button onclick="rejectLot(${lot.id})" class="px-3 py-1 bg-red-500 text-white rounded">Reject</button>`
+                                : `<span class="px-3 py-1 bg-gray-200 rounded">${lot.status}</span>`
+                            }
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading lots:', error);
+            }
+        }
+
+        async function approveLot(lotId) {
+            try {
+                await fetch(`${API_URL}/admin/lots/${lotId}/approve?user_id=${USER_ID}`, { method: 'POST' });
+                loadLots();
+            } catch (error) {
+                console.error('Error approving lot:', error);
+            }
+        }
+
+        async function rejectLot(lotId) {
+            if (!confirm('Reject this lot?')) return;
+            try {
+                await fetch(`${API_URL}/admin/lots/${lotId}/reject?user_id=${USER_ID}`, { method: 'POST' });
+                loadLots();
+            } catch (error) {
+                console.error('Error rejecting lot:', error);
+            }
+        }
+
+        // Disputes
+        async function loadDisputes() {
+            try {
+                const response = await fetch(`${API_URL}/deals/disputes?user_id=${USER_ID}`);
+                const data = await response.json();
+                
+                const list = document.getElementById('disputes-list');
+                if (!data.items || data.items.length === 0) {
+                    list.innerHTML = '<div class="p-4 text-center text-gray-500">No disputes</div>';
+                    return;
+                }
+                
+                list.innerHTML = data.items.map(dispute => `
+                    <div class="p-4">
+                        <p class="font-medium">Dispute #${dispute.id}</p>
+                        <p class="text-sm text-gray-500">${dispute.reason}</p>
+                        <div class="mt-2 space-x-2">
+                            <button onclick="resolveDispute(${dispute.id}, 'release_to_seller')" class="px-3 py-1 bg-green-500 text-white rounded text-sm">Release to Seller</button>
+                            <button onclick="resolveDispute(${dispute.id}, 'refund_to_buyer')" class="px-3 py-1 bg-blue-500 text-white rounded text-sm">Refund to Buyer</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading disputes:', error);
+            }
+        }
+
+        async function resolveDispute(disputeId, resolution) {
+            const comment = prompt('Enter resolution comment:');
+            if (!comment) return;
+            
+            try {
+                await fetch(`${API_URL}/deals/disputes/${disputeId}/resolve?user_id=${USER_ID}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ resolution, comment })
+                });
+                loadDisputes();
+            } catch (error) {
+                console.error('Error resolving dispute:', error);
+            }
+        }
+
+        // Withdrawals
+        async function loadWithdrawals(status = '') {
+            try {
+                const response = await fetch(`${API_URL}/admin/withdrawals?user_id=${USER_ID}${status ? `&status=${status}` : ''}`);
+                const data = await response.json();
+                
+                const list = document.getElementById('withdrawals-list');
+                list.innerHTML = data.items.map(withdrawal => `
+                    <div class="p-4 flex justify-between items-center">
+                        <div>
+                            <p class="font-medium">${withdrawal.seller_name}</p>
+                            <p class="text-sm text-gray-500">Amount: ${withdrawal.amount} ₽ | Method: ${withdrawal.payment_method}</p>
+                        </div>
+                        <div class="space-x-2">
+                            ${withdrawal.status === 'pending' 
+                                ? `<button onclick="approveWithdrawal(${withdrawal.id})" class="px-3 py-1 bg-green-500 text-white rounded">Approve</button>
+                                   <button onclick="rejectWithdrawal(${withdrawal.id})" class="px-3 py-1 bg-red-500 text-white rounded">Reject</button>`
+                                : `<span class="px-3 py-1 bg-gray-200 rounded">${withdrawal.status}</span>`
+                            }
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading withdrawals:', error);
+            }
+        }
+
+        async function approveWithdrawal(withdrawalId) {
+            if (!confirm('Approve this withdrawal?')) return;
+            try {
+                await fetch(`${API_URL}/admin/withdrawals/${withdrawalId}/approve?user_id=${USER_ID}`, { method: 'POST' });
+                loadWithdrawals();
+            } catch (error) {
+                console.error('Error approving withdrawal:', error);
+            }
+        }
+
+        async function rejectWithdrawal(withdrawalId) {
+            if (!confirm('Reject this withdrawal? Funds will be returned to seller.')) return;
+            try {
+                await fetch(`${API_URL}/admin/withdrawals/${withdrawalId}/reject?user_id=${USER_ID}`, { method: 'POST' });
+                loadWithdrawals();
+            } catch (error) {
+                console.error('Error rejecting withdrawal:', error);
+            }
+        }
+
+        // Load dashboard on page load
+        loadDashboard();
+    </script>
+</body>
+</html>
