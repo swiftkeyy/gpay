@@ -251,3 +251,17 @@ button:hover, a:hover, .hover\:scale-105:hover, .hover\:scale-110:hover, .hover\
 .loading-spinner {
   animation: spin-glow 1.5s linear infinite;
 }
+
+/* Shine Animation for Product Cards */
+@keyframes shine {
+  0% {
+    left: -100%;
+  }
+  100% {
+    left: 200%;
+  }
+}
+
+.animate-shine {
+  animation: shine 1.5s ease-in-out;
+}

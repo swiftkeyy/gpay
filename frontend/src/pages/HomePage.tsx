@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
-import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import api from '../api/client'
 import { useCartStore } from '../store/cartStore'
 import { useUIStore } from '../store/uiStore'
 import BottomNav from '../components/BottomNav'
+import ProductCard from '../components/ProductCard'
 
 interface Lot {
   id: number
@@ -365,95 +365,21 @@ export default function HomePage() {
           <>
             <div className="grid grid-cols-2 gap-4">
               {lots.map((lot) => (
-                <Link 
-                  key={lot.id} 
-                  to={`/product/${lot.id}`}
-                  className="group relative"
-                >
-                  {/* Glassmorphism Card with Neon Border */}
-                  <div className="relative overflow-hidden rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-red/30 hover:border-neon-red hover:shadow-neon-red-lg transition-all duration-300 hover:scale-[1.02]">
-                    {/* Image Container */}
-                    <div className="aspect-square relative overflow-hidden">
-                      {lot.images && Array.isArray(lot.images) && lot.images.length > 0 ? (
-                        <img 
-                          src={lot.images[0]} 
-                          alt={lot.title} 
-                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                          loading="lazy"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-neon-red/20 to-neon-purple/20 flex items-center justify-center">
-                          <span className="text-6xl">🎮</span>
-                        </div>
-                      )}
-                      
-                      {/* Game Badge */}
-                      {lot.game_name && (
-                        <div className="absolute top-2 left-2 px-2 py-1 bg-black/80 backdrop-blur-sm border border-neon-cyan/50 rounded text-[10px] font-gaming font-bold text-neon-cyan">
-                          {lot.game_name.toUpperCase()}
-                        </div>
-                      )}
-                      
-                      {/* Featured Badge */}
-                      {lot.is_featured && (
-                        <div className="absolute top-2 right-2 px-2 py-1 bg-gradient-to-r from-neon-gold to-yellow-500 rounded font-gaming text-[10px] font-black text-black animate-pulse-glow">
-                          ⭐ EPIC
-                        </div>
-                      )}
-                      
-                      {/* Auto Delivery Badge */}
-                      {lot.delivery_type === 'auto' && (
-                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded font-gaming text-[10px] font-black text-white shadow-neon-cyan">
-                          ⚡ INSTANT
-                        </div>
-                      )}
-                      
-                      {/* Out of Stock Overlay */}
-                      {lot.stock_count === 0 && (
-                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center">
-                          <span className="text-neon-red font-gaming font-bold text-sm">SOLD OUT</span>
-                        </div>
-                      )}
-                      
-                      {/* Gradient Overlay */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                    </div>
-                    
-                    {/* Card Content */}
-                    <div className="p-3 space-y-2">
-                      {/* Title */}
-                      <h3 className="font-gaming font-bold text-sm text-white line-clamp-2 min-h-[2.5rem] group-hover:text-neon-cyan transition-colors">
-                        {lot.title}
-                      </h3>
-                      
-                      {/* Price and Rating */}
-                      <div className="flex items-center justify-between">
-                        <div className="text-2xl font-black font-gaming text-neon-red drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]">
-                          {lot.price}₽
-                        </div>
-                        <div className="flex items-center gap-1 text-neon-gold text-xs font-gaming">
-                          ⭐ {lot.rating.toFixed(1)}
-                        </div>
-                      </div>
-
-                      {/* Seller Info */}
-                      <div className="flex items-center gap-1 text-[10px] text-gray-400 font-gaming">
-                        <span className="truncate">{lot.seller_name}</span>
-                        <span>•</span>
-                        <span className="text-neon-gold">⭐ {lot.seller_rating.toFixed(1)}</span>
-                      </div>
-                      
-                      {/* Buy Button */}
-                      <button
-                        onClick={(e) => handleAddToCart(lot.id, e)}
-                        disabled={lot.stock_count === 0}
-                        className="w-full py-2 rounded-lg font-gaming text-xs font-black tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-neon-red to-neon-purple hover:from-neon-purple hover:to-neon-cyan text-white shadow-neon-red hover:shadow-neon-purple hover:scale-105"
-                      >
-                        🛒 BUY NOW
-                      </button>
-                    </div>
-                  </div>
-                </Link>
+                <ProductCard
+                  key={lot.id}
+                  id={lot.id}
+                  title={lot.title}
+                  price={lot.price}
+                  images={lot.images}
+                  game_name={lot.game_name}
+                  seller_name={lot.seller_name}
+                  seller_rating={lot.seller_rating}
+                  rating={lot.rating}
+                  delivery_type={lot.delivery_type}
+                  stock_count={lot.stock_count}
+                  is_featured={lot.is_featured}
+                  onAddToCart={(e) => handleAddToCart(lot.id, e)}
+                />
               ))}
             </div>
 
