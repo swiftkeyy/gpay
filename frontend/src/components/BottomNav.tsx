@@ -12,7 +12,7 @@ export default function BottomNav() {
   const isActive = (path: string) => location.pathname === path
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 backdrop-blur-xl bg-cyber-dark/95 border-t-2 border-neon-red/30 shadow-neon-red">
+    <div className="fixed bottom-0 left-0 right-0 z-[9999] backdrop-blur-xl bg-cyber-dark/95 border-t-2 border-neon-red/30 shadow-neon-red pointer-events-auto">
       {/* Neon Top Line */}
       <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-neon-red to-transparent animate-pulse-glow" />
       
@@ -37,7 +37,7 @@ export default function BottomNav() {
           <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
             isActive('/') ? 'text-neon-red' : 'text-gray-500'
           }`}>
-            HOME
+            ГЛАВНАЯ
           </span>
         </Link>
         
@@ -66,7 +66,7 @@ export default function BottomNav() {
           <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
             isActive('/cart') ? 'text-neon-red' : 'text-gray-500'
           }`}>
-            CART
+            КОРЗИНА
           </span>
         </Link>
         
@@ -90,7 +90,7 @@ export default function BottomNav() {
           <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
             isActive('/orders') ? 'text-neon-red' : 'text-gray-500'
           }`}>
-            ORDERS
+            ЗАКАЗЫ
           </span>
         </Link>
         
@@ -115,7 +115,7 @@ export default function BottomNav() {
             <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
               isActive('/seller') ? 'text-neon-gold' : 'text-gray-500'
             }`}>
-              SELL
+              ПРОДАЖА
             </span>
           </Link>
         )}
@@ -140,7 +140,7 @@ export default function BottomNav() {
           <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
             isActive('/profile') ? 'text-neon-purple' : 'text-gray-500'
           }`}>
-            PROFILE
+            ПРОФИЛЬ
           </span>
         </Link>
       </div>
