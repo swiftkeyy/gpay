@@ -83,66 +83,77 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 bg-cyber-dark relative overflow-hidden">
+      {/* Animated Background Grid */}
+      <div className="fixed inset-0 opacity-10 pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(255, 0, 51, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 51, 0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px'
+        }} />
+      </div>
+
       {/* Header */}
-      <div className="bg-gradient-to-br from-tg-button to-blue-600 text-white p-6">
+      <div className="relative z-10 bg-gradient-to-br from-neon-red via-neon-purple to-neon-cyan p-6 border-b-2 border-neon-red/30 shadow-neon-red">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center text-3xl">
+          <div className="w-20 h-20 bg-black/60 backdrop-blur-sm border-2 border-neon-gold rounded-full flex items-center justify-center text-4xl animate-float shadow-neon-gold">
             👤
           </div>
           <div className="flex-1">
-            <div className="text-xl font-bold">
+            <div className="text-2xl font-black font-gaming text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">
               {user.first_name || user.username || t('profile.user')}
             </div>
-            <div className="text-sm opacity-90">
+            <div className="text-sm font-gaming text-neon-cyan">
               @{user.username || `user${user.telegram_id}`}
             </div>
           </div>
         </div>
 
         {/* Balance Card */}
-        <div className="bg-white bg-opacity-20 backdrop-blur rounded-lg p-4">
-          <div className="text-sm opacity-90 mb-1">{t('profile.balance')}</div>
-          <div className="text-3xl font-bold">
+        <div className="bg-black/60 backdrop-blur-xl border-2 border-neon-gold/50 rounded-xl p-4 hover:border-neon-gold hover:shadow-neon-gold transition-all duration-300">
+          <div className="text-sm font-gaming text-neon-cyan mb-1">{t('profile.balance')}</div>
+          <div className="text-4xl font-black font-gaming text-neon-gold drop-shadow-[0_0_15px_rgba(255,215,0,0.8)]">
             {typeof user.balance === 'number' ? user.balance.toFixed(2) : '0.00'} ₽
           </div>
-          <button className="mt-2 text-sm underline opacity-90">
-            {t('profile.topUp')}
+          <button className="mt-2 text-sm font-gaming text-white underline hover:text-neon-cyan transition-colors duration-200">
+            💎 {t('profile.topUp')}
           </button>
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 relative z-10">
         {/* Referral Program */}
         {referralStats && (
-          <div className="border border-gray-200 rounded-lg p-4 mb-4 bg-gradient-to-br from-yellow-50 to-orange-50">
+          <div className="relative overflow-hidden rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-gold/30 p-4 mb-4 hover:border-neon-gold hover:shadow-neon-gold transition-all duration-300">
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-2xl">🎁</span>
-              <h2 className="font-semibold text-lg">{t('profile.referralProgram')}</h2>
+              <span className="text-3xl animate-float">🎁</span>
+              <h2 className="font-gaming font-black text-neon-gold text-xl">{t('profile.referralProgram')}</h2>
             </div>
             
             <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="bg-white rounded-lg p-3">
-                <div className="text-sm text-gray-600">{t('profile.referrals')}</div>
-                <div className="text-2xl font-bold">{referralStats.total_referrals}</div>
+              <div className="bg-black/60 backdrop-blur-sm border-2 border-neon-cyan/30 rounded-lg p-3 hover:border-neon-cyan hover:shadow-neon-cyan transition-all duration-200">
+                <div className="text-sm text-gray-400 font-gaming">{t('profile.referrals')}</div>
+                <div className="text-3xl font-black font-gaming text-neon-cyan">{referralStats.total_referrals}</div>
               </div>
-              <div className="bg-white rounded-lg p-3">
-                <div className="text-sm text-gray-600">{t('profile.earned')}</div>
-                <div className="text-2xl font-bold">
+              <div className="bg-black/60 backdrop-blur-sm border-2 border-neon-gold/30 rounded-lg p-3 hover:border-neon-gold hover:shadow-neon-gold transition-all duration-200">
+                <div className="text-sm text-gray-400 font-gaming">{t('profile.earned')}</div>
+                <div className="text-3xl font-black font-gaming text-neon-gold">
                   {typeof referralStats.total_earned === 'number' ? referralStats.total_earned.toFixed(0) : '0'} ₽
                 </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-lg p-3 mb-3">
-              <div className="text-sm text-gray-600 mb-2">{t('profile.yourCode')}</div>
+            <div className="bg-black/60 backdrop-blur-sm border-2 border-neon-purple/30 rounded-lg p-3 mb-3 hover:border-neon-purple transition-all duration-200">
+              <div className="text-sm text-gray-400 font-gaming mb-2">{t('profile.yourCode')}</div>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-gray-100 px-3 py-2 rounded font-mono text-lg">
+                <code className="flex-1 bg-black/80 border border-neon-red/30 px-3 py-2 rounded font-mono text-lg text-neon-red font-bold">
                   {referralStats.referral_code}
                 </code>
                 <button
                   onClick={handleCopyReferralCode}
-                  className="px-4 py-2 bg-gray-200 rounded font-medium"
+                  className="px-4 py-2 bg-black/80 border-2 border-neon-cyan/50 rounded font-gaming font-bold text-neon-cyan hover:border-neon-cyan hover:shadow-neon-cyan hover:scale-110 transition-all duration-200"
                 >
                   📋
                 </button>
@@ -151,7 +162,7 @@ export default function ProfilePage() {
 
             <button
               onClick={handleShareReferral}
-              className="w-full bg-tg-button text-tg-button-text py-3 rounded-lg font-semibold"
+              className="w-full bg-gradient-to-r from-neon-gold to-yellow-500 text-black py-3 rounded-xl font-gaming font-black tracking-wide shadow-neon-gold hover:scale-105 transition-all duration-200"
             >
               {t('profile.shareReferral')}
             </button>
@@ -159,125 +170,125 @@ export default function ProfilePage() {
         )}
 
         {/* Quick Actions */}
-        <div className="space-y-2 mb-6">
+        <div className="space-y-3 mb-6">
           <Link
             to="/orders"
-            className="flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white"
+            className="flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-red/30 p-4 hover:border-neon-red hover:shadow-neon-red hover:scale-[1.02] transition-all duration-300"
           >
             <div className="flex items-center gap-3">
-              <span className="text-2xl">📦</span>
-              <span className="font-medium">{t('nav.orders')}</span>
+              <span className="text-3xl">📦</span>
+              <span className="font-gaming font-bold text-white">{t('nav.orders')}</span>
             </div>
-            <span className="text-gray-400">›</span>
+            <span className="text-neon-red text-2xl">›</span>
           </Link>
 
           {user.is_seller && (
             <Link
               to="/seller"
-              className="flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white"
+              className="flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-gold/30 p-4 hover:border-neon-gold hover:shadow-neon-gold hover:scale-[1.02] transition-all duration-300"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">💼</span>
-                <span className="font-medium">{t('nav.seller')}</span>
+                <span className="text-3xl">💼</span>
+                <span className="font-gaming font-bold text-white">{t('nav.seller')}</span>
               </div>
-              <span className="text-gray-400">›</span>
+              <span className="text-neon-gold text-2xl">›</span>
             </Link>
           )}
 
           {!user.is_seller && (
-            <button className="w-full flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white">
+            <button className="w-full flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-purple/30 p-4 hover:border-neon-purple hover:shadow-neon-purple hover:scale-[1.02] transition-all duration-300">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🏪</span>
-                <span className="font-medium">{t('profile.becomeSeller')}</span>
+                <span className="text-3xl">🏪</span>
+                <span className="font-gaming font-bold text-white">{t('profile.becomeSeller')}</span>
               </div>
-              <span className="text-gray-400">›</span>
+              <span className="text-neon-purple text-2xl">›</span>
             </button>
           )}
 
           {user.is_admin && (
             <Link
               to="/admin"
-              className="flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white"
+              className="flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-cyan/30 p-4 hover:border-neon-cyan hover:shadow-neon-cyan hover:scale-[1.02] transition-all duration-300"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">⚙️</span>
-                <span className="font-medium">{t('nav.admin')}</span>
+                <span className="text-3xl">⚙️</span>
+                <span className="font-gaming font-bold text-white">{t('nav.admin')}</span>
               </div>
-              <span className="text-gray-400">›</span>
+              <span className="text-neon-cyan text-2xl">›</span>
             </Link>
           )}
         </div>
 
         {/* Settings */}
-        <div className="border-t border-gray-200 pt-4">
-          <h2 className="font-semibold mb-3">{t('profile.settings')}</h2>
+        <div className="border-t-2 border-neon-red/30 pt-4">
+          <h2 className="font-gaming font-black text-neon-cyan mb-4 text-xl">⚙️ {t('profile.settings')}</h2>
           
-          <div className="space-y-2">
+          <div className="space-y-3">
             <button
               onClick={() => setShowLanguageModal(true)}
-              className="w-full flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white"
+              className="w-full flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-purple/30 p-4 hover:border-neon-purple hover:shadow-neon-purple hover:scale-[1.02] transition-all duration-300"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🌐</span>
+                <span className="text-3xl">🌐</span>
                 <div className="text-left">
-                  <div className="font-medium">{t('profile.language')}</div>
-                  <div className="text-sm text-gray-500">
+                  <div className="font-gaming font-bold text-white">{t('profile.language')}</div>
+                  <div className="text-sm text-gray-400 font-gaming">
                     {i18n.language === 'ru' ? 'Русский' : 'English'}
                   </div>
                 </div>
               </div>
-              <span className="text-gray-400">›</span>
+              <span className="text-neon-purple text-2xl">›</span>
             </button>
 
             <button
               onClick={handleToggleTheme}
-              className="w-full flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white"
+              className="w-full flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-cyan/30 p-4 hover:border-neon-cyan hover:shadow-neon-cyan hover:scale-[1.02] transition-all duration-300"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{theme === 'light' ? '☀️' : '🌙'}</span>
+                <span className="text-3xl">{theme === 'light' ? '☀️' : '🌙'}</span>
                 <div className="text-left">
-                  <div className="font-medium">{t('profile.theme')}</div>
-                  <div className="text-sm text-gray-500">
+                  <div className="font-gaming font-bold text-white">{t('profile.theme')}</div>
+                  <div className="text-sm text-gray-400 font-gaming">
                     {theme === 'light' ? t('profile.lightTheme') : t('profile.darkTheme')}
                   </div>
                 </div>
               </div>
-              <span className="text-gray-400">›</span>
+              <span className="text-neon-cyan text-2xl">›</span>
             </button>
 
             <Link
               to="/notifications"
-              className="flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white relative"
+              className="flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-gold/30 p-4 hover:border-neon-gold hover:shadow-neon-gold hover:scale-[1.02] transition-all duration-300 relative"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🔔</span>
-                <span className="font-medium">{t('profile.notifications')}</span>
+                <span className="text-3xl">🔔</span>
+                <span className="font-gaming font-bold text-white">{t('profile.notifications')}</span>
               </div>
               <div className="flex items-center gap-2">
                 {unreadCount > 0 && (
-                  <span className="bg-red-500 text-white text-xs rounded-full w-6 h-6 flex items-center justify-center">
+                  <span className="bg-gradient-to-r from-neon-red to-neon-purple text-white text-xs rounded-full w-7 h-7 flex items-center justify-center font-gaming font-black animate-pulse-glow">
                     {unreadCount}
                   </span>
                 )}
-                <span className="text-gray-400">›</span>
+                <span className="text-neon-gold text-2xl">›</span>
               </div>
             </Link>
 
-            <button className="w-full flex items-center justify-between border border-gray-200 rounded-lg p-4 hover:bg-gray-50 bg-white">
+            <button className="w-full flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-cyan/30 p-4 hover:border-neon-cyan hover:shadow-neon-cyan hover:scale-[1.02] transition-all duration-300">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">❓</span>
-                <span className="font-medium">{t('profile.help')}</span>
+                <span className="text-3xl">❓</span>
+                <span className="font-gaming font-bold text-white">{t('profile.help')}</span>
               </div>
-              <span className="text-gray-400">›</span>
+              <span className="text-neon-cyan text-2xl">›</span>
             </button>
 
             <button
               onClick={logout}
-              className="w-full flex items-center justify-between border border-red-200 rounded-lg p-4 hover:bg-red-50 bg-white text-red-600"
+              className="w-full flex items-center justify-between rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-red/50 p-4 hover:border-neon-red hover:shadow-neon-red hover:scale-[1.02] transition-all duration-300 text-neon-red"
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl">🚪</span>
-                <span className="font-medium">{t('profile.logout')}</span>
+                <span className="text-3xl">🚪</span>
+                <span className="font-gaming font-bold">{t('profile.logout')}</span>
               </div>
             </button>
           </div>
@@ -286,36 +297,36 @@ export default function ProfilePage() {
 
       {/* Language Modal */}
       {showLanguageModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-xl font-bold mb-4">{t('profile.selectLanguage')}</h3>
-            <div className="space-y-2">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-cyber-dark border-2 border-neon-purple rounded-xl p-6 max-w-sm w-full shadow-neon-purple">
+            <h3 className="text-2xl font-black font-gaming text-neon-purple mb-4">{t('profile.selectLanguage')}</h3>
+            <div className="space-y-3">
               <button
                 onClick={() => handleChangeLanguage('ru')}
-                className={`w-full p-4 border-2 rounded-lg text-left ${
-                  i18n.language === 'ru' ? 'border-tg-button bg-blue-50' : 'border-gray-200'
+                className={`w-full p-4 border-2 rounded-xl text-left font-gaming font-bold transition-all duration-200 hover:scale-105 ${
+                  i18n.language === 'ru' ? 'border-neon-red bg-neon-red/20 text-neon-red shadow-neon-red' : 'border-gray-700 text-gray-400 hover:border-neon-red/50'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">🇷🇺 Русский</span>
-                  {i18n.language === 'ru' && <span className="text-tg-button">✓</span>}
+                  <span>🇷🇺 Русский</span>
+                  {i18n.language === 'ru' && <span className="text-neon-red text-xl">✓</span>}
                 </div>
               </button>
               <button
                 onClick={() => handleChangeLanguage('en')}
-                className={`w-full p-4 border-2 rounded-lg text-left ${
-                  i18n.language === 'en' ? 'border-tg-button bg-blue-50' : 'border-gray-200'
+                className={`w-full p-4 border-2 rounded-xl text-left font-gaming font-bold transition-all duration-200 hover:scale-105 ${
+                  i18n.language === 'en' ? 'border-neon-red bg-neon-red/20 text-neon-red shadow-neon-red' : 'border-gray-700 text-gray-400 hover:border-neon-red/50'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">🇬🇧 English</span>
-                  {i18n.language === 'en' && <span className="text-tg-button">✓</span>}
+                  <span>🇬🇧 English</span>
+                  {i18n.language === 'en' && <span className="text-neon-red text-xl">✓</span>}
                 </div>
               </button>
             </div>
             <button
               onClick={() => setShowLanguageModal(false)}
-              className="w-full mt-4 py-3 border border-gray-300 rounded-lg font-medium"
+              className="w-full mt-4 py-3 border-2 border-gray-700 rounded-xl font-gaming font-bold text-white hover:border-neon-cyan hover:text-neon-cyan hover:scale-105 transition-all duration-200"
             >
               {t('common.cancel')}
             </button>
