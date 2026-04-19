@@ -18,17 +18,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Create ENUM types first
-    op.execute("CREATE TYPE seller_status_enum AS ENUM ('pending', 'active', 'suspended', 'banned')")
-    op.execute("CREATE TYPE lot_delivery_type_enum AS ENUM ('manual', 'auto', 'instant')")
-    op.execute("CREATE TYPE lot_status_enum AS ENUM ('draft', 'active', 'out_of_stock', 'suspended', 'deleted')")
-    op.execute("CREATE TYPE deal_status_enum AS ENUM ('created', 'paid', 'in_progress', 'waiting_confirmation', 'completed', 'disputed', 'canceled', 'refunded')")
-    op.execute("CREATE TYPE dispute_status_enum AS ENUM ('open', 'investigating', 'resolved', 'closed')")
-    op.execute("CREATE TYPE transaction_type_enum AS ENUM ('deposit', 'withdrawal', 'purchase', 'refund', 'commission', 'payout', 'bonus', 'penalty')")
-    op.execute("CREATE TYPE transaction_status_enum AS ENUM ('pending', 'completed', 'failed', 'canceled')")
-    op.execute("CREATE TYPE withdrawal_status_enum AS ENUM ('pending', 'processing', 'completed', 'failed', 'canceled')")
-    op.execute("CREATE TYPE notification_type_enum AS ENUM ('order', 'deal', 'payment', 'review', 'system', 'promo')")
-    
     # Create sellers table
     op.create_table('sellers',
         sa.Column('id', sa.Integer(), nullable=False),
@@ -268,14 +257,3 @@ def downgrade() -> None:
     op.drop_table('deals')
     op.drop_table('lots')
     op.drop_table('sellers')
-    
-    # Drop ENUM types
-    op.execute("DROP TYPE IF EXISTS notification_type_enum")
-    op.execute("DROP TYPE IF EXISTS withdrawal_status_enum")
-    op.execute("DROP TYPE IF EXISTS transaction_status_enum")
-    op.execute("DROP TYPE IF EXISTS transaction_type_enum")
-    op.execute("DROP TYPE IF EXISTS dispute_status_enum")
-    op.execute("DROP TYPE IF EXISTS deal_status_enum")
-    op.execute("DROP TYPE IF EXISTS lot_status_enum")
-    op.execute("DROP TYPE IF EXISTS lot_delivery_type_enum")
-    op.execute("DROP TYPE IF EXISTS seller_status_enum")
