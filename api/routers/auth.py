@@ -103,8 +103,7 @@ async def authenticate_telegram(
             username=username,
             first_name=first_name,
             balance=0.00,
-            referral_code=referral_code,
-            language_code=user_info.get("language_code", "en")
+            referral_code=referral_code
         )
         session.add(user)
         await session.commit()
@@ -122,7 +121,6 @@ async def authenticate_telegram(
             "first_name": user.first_name,
             "balance": float(user.balance),
             "referral_code": user.referral_code,
-            "language_code": user.language_code,
             "created_at": user.created_at.isoformat()
         }
     )
