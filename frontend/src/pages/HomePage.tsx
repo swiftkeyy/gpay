@@ -18,6 +18,7 @@ interface Lot {
   delivery_type: string
   stock_count: number
   is_featured: boolean
+  game_name?: string
 }
 
 interface Category {
@@ -53,13 +54,11 @@ export default function HomePage() {
   const { showToast } = useUIStore()
   const observerTarget = useRef<HTMLDivElement>(null)
 
-  // Fetch categories and games on mount
   useEffect(() => {
     fetchCategories()
     fetchGames()
   }, [])
 
-  // Fetch lots when filters change
   useEffect(() => {
     setLots([])
     setPage(1)
@@ -67,7 +66,6 @@ export default function HomePage() {
     fetchLots(1, true)
   }, [search, sortBy, deliveryType, minPrice, maxPrice, selectedGame, selectedCategory])
 
-  // Infinite scroll observer
   useEffect(() => {
     const observer = new IntersectionObserver(
       entries => {
@@ -85,7 +83,6 @@ export default function HomePage() {
     return () => observer.disconnect()
   }, [hasMore, loading])
 
-  // Fetch more lots when page changes
   useEffect(() => {
     if (page > 1) {
       fetchLots(page, false)
@@ -168,238 +165,311 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen pb-20 bg-gray-50">
-      {/* Header */}
-      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10 shadow-sm">
-        <h1 className="text-2xl font-bold mb-3 text-gray-900">🎮 {t('app.title')}</h1>
-        
-        {/* Search */}
-        <div className="relative mb-3">
-          <input
-            type="text"
-            placeholder={t('home.search')}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-          />
-          {search && (
-            <button
-              onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              ✕
-            </button>
-          )}
-        </div>
+    <div className="min-h-screen pb-20 bg-cyber-dark relative overflow-hidden">
+      {/* Animated Background Grid */}
+      <div className="fixed inset-0 opacity-10 pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `
+            linear-gradient(rgba(255, 0, 51, 0.1) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 0, 51, 0.1) 1px, transparent 1px)
+          `,
+          backgroundSize: '50px 50px'
+        }} />
+      </div>
 
-        {/* Horizontal Game Categories (Playerok-style) */}
-        {games.length > 0 && (
-          <div className="mb-3 -mx-4 px-4 overflow-x-auto">
-            <div className="flex gap-3 pb-2">
-              <button
-                onClick={() => setSelectedGame('')}
-                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                  selectedGame === '' 
-                    ? 'bg-purple-600 text-white shadow-lg' 
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                }`}
-              >
-                Все игры
-              </button>
-              {games.map(game => (
-                <button
-                  key={game.id}
-                  onClick={() => setSelectedGame(String(game.id))}
-                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    selectedGame === String(game.id)
-                      ? 'bg-purple-600 text-white shadow-lg'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {game.name}
-                </button>
-              ))}
+      {/* Epic Header with Logo */}
+      <div className="sticky top-0 z-50 backdrop-blur-xl bg-cyber-dark/90 border-b border-neon-red/30 shadow-neon-red">
+        <div className="p-4">
+          {/* Logo and Balance */}
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              {/* Game Pay Logo */}
+              <div className="relative">
+                <div className="text-4xl font-black font-gaming text-white tracking-wider drop-shadow-[0_0_15px_rgba(255,0,51,0.8)]">
+                  <span className="text-neon-red">G</span>
+                  <span className="text-white">P</span>
+                </div>
+                <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-neon-red to-transparent animate-pulse-glow" />
+              </div>
+              <div>
+                <div className="text-xl font-black font-gaming text-neon-red tracking-wide drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]">
+                  GAME PAY
+                </div>
+                <div className="text-[8px] text-neon-cyan font-gaming tracking-widest">
+                  PREMIUM MARKETPLACE
+                </div>
+              </div>
+            </div>
+            
+            {/* Balance */}
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-black/40 border border-neon-gold/30 shadow-neon-gold">
+              <span className="text-2xl">💎</span>
+              <div className="text-right">
+                <div className="text-xs text-neon-cyan font-gaming">BALANCE</div>
+                <div className="text-sm font-bold text-neon-gold">0 ₽</div>
+              </div>
             </div>
           </div>
-        )}
+          
+          {/* Epic Search */}
+          <div className="relative mb-4 group">
+            <div className="absolute inset-0 bg-gradient-to-r from-neon-red/20 via-neon-purple/20 to-neon-cyan/20 rounded-xl blur-lg group-focus-within:blur-xl transition-all" />
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="🔍 Search epic items..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full px-5 py-3 pr-12 bg-black/60 border-2 border-neon-red/50 rounded-xl text-white placeholder-gray-400 font-gaming focus:outline-none focus:border-neon-red focus:scale-[1.02] transition-all shadow-neon-red backdrop-blur-sm"
+              />
+              {search && (
+                <button
+                  onClick={() => setSearch('')}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-neon-red hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          </div>
 
-        {/* Filter and Sort buttons */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex-1 px-4 py-2 border rounded-lg text-sm font-medium transition-all ${
-              showFilters 
-                ? 'bg-purple-50 border-purple-500 text-purple-700' 
-                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            🔍 {t('home.filters')}
-          </button>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            <option value="popularity">{t('home.sortBy.popularity')}</option>
-            <option value="price_asc">{t('home.sortBy.priceAsc')}</option>
-            <option value="price_desc">{t('home.sortBy.priceDesc')}</option>
-            <option value="newest">{t('home.sortBy.newest')}</option>
-            <option value="rating">{t('home.sortBy.rating')}</option>
-          </select>
+          {/* Game Categories - Cyberpunk Style */}
+          {games.length > 0 && (
+            <div className="mb-4 -mx-4 px-4 overflow-x-auto scrollbar-hide">
+              <div className="flex gap-2 pb-2">
+                <button
+                  onClick={() => setSelectedGame('')}
+                  className={`flex-shrink-0 px-4 py-2 rounded-lg font-gaming text-xs font-bold tracking-wide transition-all ${
+                    selectedGame === '' 
+                      ? 'bg-gradient-to-r from-neon-red to-neon-purple text-white shadow-neon-red-lg animate-pulse-glow border-2 border-neon-red' 
+                      : 'bg-black/40 text-gray-400 border-2 border-gray-700 hover:border-neon-red/50 hover:text-white'
+                  }`}
+                >
+                  ALL GAMES
+                </button>
+                {games.map(game => (
+                  <button
+                    key={game.id}
+                    onClick={() => setSelectedGame(String(game.id))}
+                    className={`flex-shrink-0 px-4 py-2 rounded-lg font-gaming text-xs font-bold tracking-wide transition-all ${
+                      selectedGame === String(game.id)
+                        ? 'bg-gradient-to-r from-neon-red to-neon-purple text-white shadow-neon-red-lg animate-pulse-glow border-2 border-neon-red'
+                        : 'bg-black/40 text-gray-400 border-2 border-gray-700 hover:border-neon-red/50 hover:text-white'
+                    }`}
+                  >
+                    {game.name.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Filter and Sort - Gaming HUD Style */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex-1 px-4 py-2 rounded-lg font-gaming text-xs font-bold tracking-wide transition-all ${
+                showFilters 
+                  ? 'bg-gradient-to-r from-neon-purple to-neon-cyan text-white shadow-neon-purple border-2 border-neon-purple' 
+                  : 'bg-black/40 text-gray-400 border-2 border-gray-700 hover:border-neon-purple/50 hover:text-white'
+              }`}
+            >
+              🎯 FILTERS
+            </button>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="flex-1 px-4 py-2 bg-black/60 border-2 border-neon-cyan/50 rounded-lg text-white font-gaming text-xs font-bold focus:outline-none focus:border-neon-cyan focus:shadow-neon-cyan transition-all"
+            >
+              <option value="popularity">🔥 POPULAR</option>
+              <option value="price_asc">💰 CHEAP FIRST</option>
+              <option value="price_desc">💎 EXPENSIVE FIRST</option>
+              <option value="newest">⚡ NEWEST</option>
+              <option value="rating">⭐ TOP RATED</option>
+            </select>
+          </div>
         </div>
       </div>
 
-      {/* Filters Panel */}
+      {/* Filters Panel - Cyberpunk */}
       {showFilters && (
-        <div className="bg-white p-4 border-b border-gray-200 shadow-sm">
+        <div className="bg-black/80 backdrop-blur-xl border-b border-neon-purple/30 p-4 shadow-neon-purple animate-slide-down">
           <div className="space-y-3">
-            {/* Category filter */}
             <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">{t('lot.category')}</label>
+              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">CATEGORY</label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
               >
-                <option value="">{t('common.all')}</option>
+                <option value="">ALL CATEGORIES</option>
                 {categories.map(cat => (
-                  <option key={cat.id} value={cat.id}>{cat.name}</option>
+                  <option key={cat.id} value={cat.id}>{cat.name.toUpperCase()}</option>
                 ))}
               </select>
             </div>
 
-            {/* Delivery type filter */}
             <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">{t('product.deliveryType')}</label>
+              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">DELIVERY</label>
               <select
                 value={deliveryType}
                 onChange={(e) => setDeliveryType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
               >
-                <option value="">{t('common.all')}</option>
-                <option value="auto">⚡ {t('home.deliveryType.auto')}</option>
-                <option value="manual">{t('home.deliveryType.manual')}</option>
+                <option value="">ALL TYPES</option>
+                <option value="auto">⚡ AUTO DELIVERY</option>
+                <option value="manual">👤 MANUAL</option>
               </select>
             </div>
 
-            {/* Price range */}
             <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700">{t('product.price')}</label>
+              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">PRICE RANGE</label>
               <div className="flex gap-2">
                 <input
                   type="number"
-                  placeholder="Min"
+                  placeholder="MIN"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
                 />
                 <input
                   type="number"
-                  placeholder="Max"
+                  placeholder="MAX"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="flex-1 px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
                 />
               </div>
             </div>
 
-            {/* Clear filters */}
             <button
               onClick={clearFilters}
-              className="w-full py-2 text-purple-600 text-sm font-medium hover:text-purple-700"
+              className="w-full py-2 text-neon-red font-gaming text-sm font-bold hover:text-white transition-colors"
             >
-              {t('common.clear')}
+              ✕ CLEAR ALL
             </button>
           </div>
         </div>
       )}
 
-      {/* Lots Grid */}
-      <div className="p-4">
+      {/* Epic Product Grid */}
+      <div className="p-4 relative z-10">
         {loading && lots.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">{t('app.loading')}</div>
+          <div className="text-center py-20">
+            <div className="inline-block animate-spin text-6xl">⚡</div>
+            <div className="text-neon-cyan font-gaming mt-4">LOADING EPIC ITEMS...</div>
+          </div>
         ) : lots.length === 0 ? (
-          <div className="text-center py-10 text-gray-500">{t('home.noResults')}</div>
+          <div className="text-center py-20 text-gray-500 font-gaming">NO ITEMS FOUND</div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-4">
               {lots.map((lot) => (
-                <div key={lot.id} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
-                  <Link to={`/product/${lot.id}`}>
-                    <div className="aspect-square bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center relative">
+                <Link 
+                  key={lot.id} 
+                  to={`/product/${lot.id}`}
+                  className="group relative"
+                >
+                  {/* Glassmorphism Card with Neon Border */}
+                  <div className="relative overflow-hidden rounded-xl bg-black/40 backdrop-blur-sm border-2 border-neon-red/30 hover:border-neon-red hover:shadow-neon-red-lg transition-all duration-300 hover:scale-[1.02]">
+                    {/* Image Container */}
+                    <div className="aspect-square relative overflow-hidden">
                       {lot.images && Array.isArray(lot.images) && lot.images.length > 0 ? (
                         <img 
                           src={lot.images[0]} 
                           alt={lot.title} 
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                           loading="lazy"
                         />
                       ) : (
-                        <span className="text-4xl">🎮</span>
+                        <div className="w-full h-full bg-gradient-to-br from-neon-red/20 to-neon-purple/20 flex items-center justify-center">
+                          <span className="text-6xl">🎮</span>
+                        </div>
                       )}
+                      
+                      {/* Game Badge */}
+                      {lot.game_name && (
+                        <div className="absolute top-2 left-2 px-2 py-1 bg-black/80 backdrop-blur-sm border border-neon-cyan/50 rounded text-[10px] font-gaming font-bold text-neon-cyan">
+                          {lot.game_name.toUpperCase()}
+                        </div>
+                      )}
+                      
+                      {/* Featured Badge */}
                       {lot.is_featured && (
-                        <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
-                          ⭐ TOP
+                        <div className="absolute top-2 right-2 px-2 py-1 bg-gradient-to-r from-neon-gold to-yellow-500 rounded font-gaming text-[10px] font-black text-black animate-pulse-glow">
+                          ⭐ EPIC
                         </div>
                       )}
+                      
+                      {/* Auto Delivery Badge */}
                       {lot.delivery_type === 'auto' && (
-                        <div className="absolute top-2 left-2 bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
-                          ⚡ Авто
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-gradient-to-r from-green-500 to-emerald-500 rounded font-gaming text-[10px] font-black text-white shadow-neon-cyan">
+                          ⚡ INSTANT
                         </div>
                       )}
+                      
+                      {/* Out of Stock Overlay */}
                       {lot.stock_count === 0 && (
-                        <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
-                          <span className="text-white font-bold text-sm">{t('product.outOfStock')}</span>
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center">
+                          <span className="text-neon-red font-gaming font-bold text-sm">SOLD OUT</span>
                         </div>
                       )}
+                      
+                      {/* Gradient Overlay */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                     </div>
-                  </Link>
-                  
-                  <div className="p-3">
-                    <Link to={`/product/${lot.id}`}>
-                      <h3 className="font-semibold text-sm mb-1 line-clamp-2 min-h-[2.5rem] text-gray-900">
+                    
+                    {/* Card Content */}
+                    <div className="p-3 space-y-2">
+                      {/* Title */}
+                      <h3 className="font-gaming font-bold text-sm text-white line-clamp-2 min-h-[2.5rem] group-hover:text-neon-cyan transition-colors">
                         {lot.title}
                       </h3>
-                    </Link>
-                    
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-lg font-bold text-purple-600">
-                        {lot.price} ₽
-                      </span>
-                      <span className="text-xs text-yellow-500 font-medium">
-                        ⭐ {lot.rating.toFixed(1)}
-                      </span>
-                    </div>
+                      
+                      {/* Price and Rating */}
+                      <div className="flex items-center justify-between">
+                        <div className="text-2xl font-black font-gaming text-neon-red drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]">
+                          {lot.price}₽
+                        </div>
+                        <div className="flex items-center gap-1 text-neon-gold text-xs font-gaming">
+                          ⭐ {lot.rating.toFixed(1)}
+                        </div>
+                      </div>
 
-                    <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
-                      <span className="truncate">{lot.seller_name}</span>
-                      <span>•</span>
-                      <span className="text-yellow-500">⭐ {lot.seller_rating.toFixed(1)}</span>
+                      {/* Seller Info */}
+                      <div className="flex items-center gap-1 text-[10px] text-gray-400 font-gaming">
+                        <span className="truncate">{lot.seller_name}</span>
+                        <span>•</span>
+                        <span className="text-neon-gold">⭐ {lot.seller_rating.toFixed(1)}</span>
+                      </div>
+                      
+                      {/* Buy Button */}
+                      <button
+                        onClick={(e) => handleAddToCart(lot.id, e)}
+                        disabled={lot.stock_count === 0}
+                        className="w-full py-2 rounded-lg font-gaming text-xs font-black tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-gradient-to-r from-neon-red to-neon-purple hover:from-neon-purple hover:to-neon-cyan text-white shadow-neon-red hover:shadow-neon-purple hover:scale-105"
+                      >
+                        🛒 BUY NOW
+                      </button>
                     </div>
-                    
-                    <button
-                      onClick={(e) => handleAddToCart(lot.id, e)}
-                      disabled={lot.stock_count === 0}
-                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-blue-700 transition-all shadow-sm"
-                    >
-                      {t('product.addToCart')}
-                    </button>
                   </div>
-                </div>
+                </Link>
               ))}
             </div>
 
-            {/* Infinite scroll trigger */}
+            {/* Infinite Scroll Trigger */}
             {hasMore && (
-              <div ref={observerTarget} className="text-center py-4">
-                {loading && <div className="text-gray-500">{t('app.loading')}</div>}
+              <div ref={observerTarget} className="text-center py-8">
+                {loading && (
+                  <div className="inline-block animate-spin text-4xl">⚡</div>
+                )}
               </div>
             )}
           </>
         )}
       </div>
 
-      {/* Bottom Navigation */}
+      {/* Epic Bottom Navigation */}
       <BottomNav />
     </div>
   )

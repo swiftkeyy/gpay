@@ -14,53 +14,138 @@ export default function BottomNav() {
   const isActive = (path: string) => location.pathname === path
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-tg-bg border-t border-gray-200 flex justify-around py-2 safe-area-inset-bottom">
-      <Link 
-        to="/" 
-        className={`flex flex-col items-center p-2 ${isActive('/') ? 'text-tg-button' : 'text-gray-600'}`}
-      >
-        <span className="text-2xl">{isActive('/') ? '🏠' : '🏘️'}</span>
-        <span className="text-xs">{t('nav.home')}</span>
-      </Link>
+    <div className="fixed bottom-0 left-0 right-0 z-50 backdrop-blur-xl bg-cyber-dark/95 border-t-2 border-neon-red/30 shadow-neon-red">
+      {/* Neon Top Line */}
+      <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-neon-red to-transparent animate-pulse-glow" />
       
-      <Link 
-        to="/cart" 
-        className={`flex flex-col items-center p-2 relative ${isActive('/cart') ? 'text-tg-button' : 'text-gray-600'}`}
-      >
-        <span className="text-2xl">🛒</span>
-        {cartCount > 0 && (
-          <span className="absolute top-0 right-0 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
-            {cartCount}
-          </span>
-        )}
-        <span className="text-xs">{t('nav.cart')}</span>
-      </Link>
-      
-      <Link 
-        to="/orders" 
-        className={`flex flex-col items-center p-2 ${isActive('/orders') ? 'text-tg-button' : 'text-gray-600'}`}
-      >
-        <span className="text-2xl">📦</span>
-        <span className="text-xs">{t('nav.orders')}</span>
-      </Link>
-      
-      {user?.is_seller && (
+      <div className="flex justify-around items-center py-2 px-2 safe-area-inset-bottom">
+        {/* Home */}
         <Link 
-          to="/seller" 
-          className={`flex flex-col items-center p-2 ${isActive('/seller') ? 'text-tg-button' : 'text-gray-600'}`}
+          to="/" 
+          className={`flex flex-col items-center p-2 min-w-[60px] transition-all ${
+            isActive('/') 
+              ? 'text-neon-red scale-110' 
+              : 'text-gray-500 hover:text-neon-cyan'
+          }`}
         >
-          <span className="text-2xl">💼</span>
-          <span className="text-xs">{t('nav.seller')}</span>
+          <div className={`relative ${isActive('/') ? 'animate-float' : ''}`}>
+            <div className={`text-2xl ${isActive('/') ? 'drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]' : ''}`}>
+              🏠
+            </div>
+            {isActive('/') && (
+              <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-neon-red shadow-neon-red" />
+            )}
+          </div>
+          <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
+            isActive('/') ? 'text-neon-red' : 'text-gray-500'
+          }`}>
+            HOME
+          </span>
         </Link>
-      )}
-      
-      <Link 
-        to="/profile" 
-        className={`flex flex-col items-center p-2 ${isActive('/profile') ? 'text-tg-button' : 'text-gray-600'}`}
-      >
-        <span className="text-2xl">👤</span>
-        <span className="text-xs">{t('nav.profile')}</span>
-      </Link>
+        
+        {/* Cart */}
+        <Link 
+          to="/cart" 
+          className={`flex flex-col items-center p-2 min-w-[60px] relative transition-all ${
+            isActive('/cart') 
+              ? 'text-neon-red scale-110' 
+              : 'text-gray-500 hover:text-neon-cyan'
+          }`}
+        >
+          <div className={`relative ${isActive('/cart') ? 'animate-float' : ''}`}>
+            <div className={`text-2xl ${isActive('/cart') ? 'drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]' : ''}`}>
+              🛒
+            </div>
+            {cartCount > 0 && (
+              <div className="absolute -top-1 -right-1 min-w-[18px] h-[18px] flex items-center justify-center bg-gradient-to-r from-neon-red to-neon-purple text-white text-[10px] font-gaming font-black rounded-full border border-white shadow-neon-red animate-pulse-glow">
+                {cartCount}
+              </div>
+            )}
+            {isActive('/cart') && (
+              <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-neon-red shadow-neon-red" />
+            )}
+          </div>
+          <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
+            isActive('/cart') ? 'text-neon-red' : 'text-gray-500'
+          }`}>
+            CART
+          </span>
+        </Link>
+        
+        {/* Orders */}
+        <Link 
+          to="/orders" 
+          className={`flex flex-col items-center p-2 min-w-[60px] transition-all ${
+            isActive('/orders') 
+              ? 'text-neon-red scale-110' 
+              : 'text-gray-500 hover:text-neon-cyan'
+          }`}
+        >
+          <div className={`relative ${isActive('/orders') ? 'animate-float' : ''}`}>
+            <div className={`text-2xl ${isActive('/orders') ? 'drop-shadow-[0_0_10px_rgba(255,0,51,0.8)]' : ''}`}>
+              📦
+            </div>
+            {isActive('/orders') && (
+              <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-neon-red shadow-neon-red" />
+            )}
+          </div>
+          <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
+            isActive('/orders') ? 'text-neon-red' : 'text-gray-500'
+          }`}>
+            ORDERS
+          </span>
+        </Link>
+        
+        {/* Seller (if applicable) */}
+        {user?.is_seller && (
+          <Link 
+            to="/seller" 
+            className={`flex flex-col items-center p-2 min-w-[60px] transition-all ${
+              isActive('/seller') 
+                ? 'text-neon-gold scale-110' 
+                : 'text-gray-500 hover:text-neon-cyan'
+            }`}
+          >
+            <div className={`relative ${isActive('/seller') ? 'animate-float' : ''}`}>
+              <div className={`text-2xl ${isActive('/seller') ? 'drop-shadow-[0_0_10px_rgba(255,215,0,0.8)]' : ''}`}>
+                💼
+              </div>
+              {isActive('/seller') && (
+                <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-neon-gold shadow-neon-gold" />
+              )}
+            </div>
+            <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
+              isActive('/seller') ? 'text-neon-gold' : 'text-gray-500'
+            }`}>
+              SELL
+            </span>
+          </Link>
+        )}
+        
+        {/* Profile */}
+        <Link 
+          to="/profile" 
+          className={`flex flex-col items-center p-2 min-w-[60px] transition-all ${
+            isActive('/profile') 
+              ? 'text-neon-purple scale-110' 
+              : 'text-gray-500 hover:text-neon-cyan'
+          }`}
+        >
+          <div className={`relative ${isActive('/profile') ? 'animate-float' : ''}`}>
+            <div className={`text-2xl ${isActive('/profile') ? 'drop-shadow-[0_0_10px_rgba(157,78,221,0.8)]' : ''}`}>
+              👤
+            </div>
+            {isActive('/profile') && (
+              <div className="absolute -bottom-1 left-0 right-0 h-0.5 bg-neon-purple shadow-neon-purple" />
+            )}
+          </div>
+          <span className={`text-[10px] font-gaming font-bold mt-1 tracking-wide ${
+            isActive('/profile') ? 'text-neon-purple' : 'text-gray-500'
+          }`}>
+            PROFILE
+          </span>
+        </Link>
+      </div>
     </div>
   )
 }

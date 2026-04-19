@@ -1,0 +1,233 @@
+/* Cyberpunk Gaming Styles */
+
+/* Text Glow Effects */
+.text-glow-red {
+  text-shadow: 0 0 10px rgba(255, 0, 51, 0.8),
+               0 0 20px rgba(255, 0, 51, 0.5),
+               0 0 30px rgba(255, 0, 51, 0.3);
+}
+
+.text-glow-cyan {
+  text-shadow: 0 0 10px rgba(0, 240, 255, 0.8),
+               0 0 20px rgba(0, 240, 255, 0.5),
+               0 0 30px rgba(0, 240, 255, 0.3);
+}
+
+.text-glow-purple {
+  text-shadow: 0 0 10px rgba(157, 78, 221, 0.8),
+               0 0 20px rgba(157, 78, 221, 0.5),
+               0 0 30px rgba(157, 78, 221, 0.3);
+}
+
+.text-glow-gold {
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.8),
+               0 0 20px rgba(255, 215, 0, 0.5),
+               0 0 30px rgba(255, 215, 0, 0.3);
+}
+
+/* Glassmorphism */
+.glass {
+  background: rgba(10, 10, 15, 0.4);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 0, 51, 0.2);
+}
+
+/* Animated Grid Background */
+@keyframes grid-move {
+  0% {
+    background-position: 0 0;
+  }
+  100% {
+    background-position: 50px 50px;
+  }
+}
+
+.animated-grid {
+  animation: grid-move 20s linear infinite;
+}
+
+/* Neon Button Hover */
+.neon-button {
+  position: relative;
+  overflow: hidden;
+}
+
+.neon-button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 0, 51, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+.neon-button:hover::before {
+  width: 300px;
+  height: 300px;
+}
+
+/* Scan Line Effect */
+@keyframes scan {
+  0% {
+    top: 0;
+  }
+  100% {
+    top: 100%;
+  }
+}
+
+.scan-line {
+  position: relative;
+  overflow: hidden;
+}
+
+.scan-line::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, 
+    transparent, 
+    rgba(0, 240, 255, 0.8), 
+    transparent
+  );
+  animation: scan 3s linear infinite;
+}
+
+/* Holographic Effect */
+@keyframes hologram {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.hologram {
+  animation: hologram 2s ease-in-out infinite;
+}
+
+/* Glitch Effect */
+@keyframes glitch {
+  0% {
+    transform: translate(0);
+  }
+  20% {
+    transform: translate(-2px, 2px);
+  }
+  40% {
+    transform: translate(-2px, -2px);
+  }
+  60% {
+    transform: translate(2px, 2px);
+  }
+  80% {
+    transform: translate(2px, -2px);
+  }
+  100% {
+    transform: translate(0);
+  }
+}
+
+.glitch:hover {
+  animation: glitch 0.3s infinite;
+}
+
+/* Particle Background */
+.particles {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Energy Bar */
+.energy-bar {
+  position: relative;
+  height: 4px;
+  background: rgba(255, 0, 51, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.energy-bar::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, 
+    transparent,
+    rgba(255, 0, 51, 0.8),
+    transparent
+  );
+  animation: energy-flow 2s linear infinite;
+}
+
+@keyframes energy-flow {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Cyber Border */
+.cyber-border {
+  position: relative;
+}
+
+.cyber-border::before,
+.cyber-border::after {
+  content: '';
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid #FF0033;
+}
+
+.cyber-border::before {
+  top: -2px;
+  left: -2px;
+  border-right: none;
+  border-bottom: none;
+}
+
+.cyber-border::after {
+  bottom: -2px;
+  right: -2px;
+  border-left: none;
+  border-top: none;
+}
+
+/* Loading Spinner */
+@keyframes spin-glow {
+  0% {
+    transform: rotate(0deg);
+    filter: drop-shadow(0 0 10px rgba(255, 0, 51, 0.8));
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(0, 240, 255, 0.8));
+  }
+  100% {
+    transform: rotate(360deg);
+    filter: drop-shadow(0 0 10px rgba(255, 0, 51, 0.8));
+  }
+}
+
+.loading-spinner {
+  animation: spin-glow 1.5s linear infinite;
+}
