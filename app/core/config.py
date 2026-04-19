@@ -92,6 +92,9 @@ class Settings(BaseSettings):
     shop_name: str = Field("Game Pay", alias="SHOP_NAME")
     super_admin_tg_id: int = Field(0, alias="SUPER_ADMIN_TG_ID")
     second_admin_tg_id: int = Field(0, alias="SECOND_ADMIN_TG_ID")
+    
+    # CORS settings
+    cors_origins: str = Field("*", alias="CORS_ORIGINS")
 
     telegram_stars_enabled: bool = Field(True, alias="TELEGRAM_STARS_ENABLED")
     # 1 рубль = 0.5 звезды (или 1 звезда = 2 рубля) - стандартный курс Telegram
