@@ -1,66 +1,54 @@
-"""Authentication router for Telegram Mini App."""
-from __future__ import annotations
+"""Authentication router for Telegram Mini App.
 
-import hashlib
-import hmac
-from urllib.parse import parse_qsl
+This router handles Telegram authentication endpoints using the AuthService
+for secure initData validation.
+
+Requirements: 1.1, 1.2, 1.3, 1.6, 1.7
+"""
+from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from api.services.auth import AuthService
 from app.core.config import get_settings
 from app.db.session import get_db_session
-from app.models import User
-from app.repositories.users import UserRepository
 
 router = APIRouter()
 settings = get_settings()
 
 
 class TelegramAuthRequest(BaseModel):
+    """Request model for Telegram authentication.
+    
+    Requirements: 1.1
+    """
     init_data: str
 
 
+class UserProfile(BaseModel):
+    """User profile data returned in auth response.
+    
+    Requirements: 1.6
+    """
+    id: int
+    telegram_id: int
+    username: str | None
+    first_name: str | None
+    balance: float
+    referral_code: str
+    created_at: str
+
+
 class AuthResponse(BaseModel):
+    """Response model for successful authentication.
+    
+    Requirements: 1.6
+    """
     access_token: str
     token_type: str = "bearer"
-    user: dict
-
-
-def validate_telegram_init_data(init_data: str, bot_token: str) -> dict | None:
-    """Validate Telegram initData using HMAC-SHA256."""
-    try:
-        parsed_data = dict(parse_qsl(init_data))
-        hash_value = parsed_data.pop("hash", None)
-        
-        if not hash_value:
-            return None
-        
-        # Create data check string
-        data_check_arr = [f"{k}={v}" for k, v in sorted(parsed_data.items())]
-        data_check_string = "\n".join(data_check_arr)
-        
-        # Calculate secret key
-        secret_key = hmac.new(
-            "WebAppData".encode(),
-            bot_token.encode(),
-            hashlib.sha256
-        ).digest()
-        
-        # Calculate hash
-        calculated_hash = hmac.new(
-            secret_key,
-            data_check_string.encode(),
-            hashlib.sha256
-        ).hexdigest()
-        
-        if calculated_hash != hash_value:
-            return None
-        
-        return parsed_data
-    except Exception:
-        return None
+    user: UserProfile
 
 
 @router.post("/telegram", response_model=AuthResponse)
@@ -68,59 +56,47 @@ async def authenticate_telegram(
     request: TelegramAuthRequest,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Authenticate user via Telegram initData."""
-    # Validate initData
-    user_data = validate_telegram_init_data(request.init_data, settings.bot_token)
+    """Authenticate user via Telegram initData.
     
-    if not user_data:
-        raise HTTPException(status_code=401, detail="Invalid authentication data")
+    This endpoint validates the Telegram initData using HMAC-SHA256 and
+    creates or retrieves the user account. Returns an access token and
+    user profile on success.
     
-    # Extract user info
-    user_json = user_data.get("user")
-    if not user_json:
-        raise HTTPException(status_code=401, detail="User data not found")
+    Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7
     
-    import json
-    user_info = json.loads(user_json)
-    telegram_id = user_info.get("id")
-    username = user_info.get("username")
-    first_name = user_info.get("first_name")
-    
-    if not telegram_id:
-        raise HTTPException(status_code=401, detail="Telegram ID not found")
-    
-    # Get or create user
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_telegram_id(telegram_id)
-    
-    if not user:
-        # Create new user
-        import secrets
-        referral_code = secrets.token_urlsafe(8)[:12]
+    Args:
+        request: Authentication request with initData
+        session: Database session
         
-        user = User(
-            telegram_id=telegram_id,
-            username=username,
-            first_name=first_name,
-            balance=0.00,
-            referral_code=referral_code
-        )
-        session.add(user)
-        await session.commit()
-        await session.refresh(user)
+    Returns:
+        AuthResponse with access token and user profile
+        
+    Raises:
+        HTTPException: 401 if authentication fails
+    """
+    # Initialize auth service
+    auth_service = AuthService(session, settings.bot_token)
     
-    # Generate access token (simplified - in production use JWT)
-    access_token = f"user_{user.id}_{user.telegram_id}"
+    try:
+        # Authenticate user (validates initData and creates/retrieves user)
+        user, is_new_user = await auth_service.authenticate_user(request.init_data)
+    except ValueError as e:
+        # Requirement 1.3: Return 401 for invalid hash
+        raise HTTPException(status_code=401, detail=str(e))
     
+    # Generate access token (Requirement 1.6)
+    access_token = auth_service.generate_access_token(user)
+    
+    # Return access token and user profile (Requirement 1.6, 1.7)
     return AuthResponse(
         access_token=access_token,
-        user={
-            "id": user.id,
-            "telegram_id": user.telegram_id,
-            "username": user.username,
-            "first_name": user.first_name,
-            "balance": float(user.balance),
-            "referral_code": user.referral_code,
-            "created_at": user.created_at.isoformat()
-        }
+        user=UserProfile(
+            id=user.id,
+            telegram_id=user.telegram_id,
+            username=user.username,
+            first_name=user.first_name,
+            balance=float(user.balance),
+            referral_code=user.referral_code,
+            created_at=user.created_at.isoformat()
+        )
     )

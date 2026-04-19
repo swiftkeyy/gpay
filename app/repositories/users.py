@@ -23,6 +23,11 @@ class UserRepository(BaseRepository[User]):
         stmt = select(User).where(User.telegram_id == telegram_id)
         return await self.session.scalar(stmt)
 
+    async def get_by_referral_code(self, referral_code: str) -> User | None:
+        """Get user by referral code."""
+        stmt = select(User).where(User.referral_code == referral_code)
+        return await self.session.scalar(stmt)
+
 
 class AdminRepository(BaseRepository[Admin]):
     model = Admin

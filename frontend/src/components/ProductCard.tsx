@@ -76,8 +76,6 @@ export default function ProductCard({
   is_featured,
   onAddToCart
 }: ProductCardProps) {
-  const rarity = getRarity(price, is_featured)
-  const config = rarityConfig[rarity]
 
   return (
     <Link 
@@ -85,18 +83,7 @@ export default function ProductCard({
       className="group relative block"
     >
       {/* Premium Card Container */}
-      <div className={`
-        relative overflow-hidden rounded-2xl 
-        bg-[#0F0F17] backdrop-blur-xl
-        border-2 ${config.border} ${config.borderHover}
-        ${config.shadow}
-        transition-all duration-300 
-        hover:scale-[1.03] hover:-translate-y-1
-        ${rarity === 'legendary' ? config.glow : ''}
-      `}>
-        
-        {/* Animated Border Glow Effect */}
-        <div className={`absolute inset-0 bg-gradient-to-br ${config.gradient} opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none`} />
+      <div className="relative overflow-hidden rounded-2xl bg-[#0F0F17] backdrop-blur-xl border-2 border-neon-red/30 hover:border-neon-red hover:shadow-[0_0_30px_rgba(255,0,51,0.6)] transition-all duration-300 hover:scale-[1.03] hover:-translate-y-1">
         
         {/* Shine Effect on Hover */}
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
@@ -113,7 +100,7 @@ export default function ProductCard({
               loading="lazy"
             />
           ) : (
-            <div className={`w-full h-full bg-gradient-to-br ${config.gradient} flex items-center justify-center`}>
+            <div className="w-full h-full bg-gradient-to-br from-neon-red/20 to-neon-purple/20 flex items-center justify-center">
               <span className="text-7xl opacity-50">🎮</span>
             </div>
           )}
@@ -127,11 +114,6 @@ export default function ProductCard({
               {game_name.toUpperCase()}
             </div>
           )}
-          
-          {/* Rarity Badge - Top Right */}
-          <div className={`absolute top-3 right-3 px-3 py-1.5 backdrop-blur-md border-2 rounded-lg font-gaming text-xs font-black tracking-wider ${config.badge}`}>
-            {config.badgeText}
-          </div>
           
           {/* Auto Delivery Badge - Bottom Left */}
           {delivery_type === 'auto' && (
@@ -162,12 +144,7 @@ export default function ProductCard({
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
               <div className="text-xs text-gray-400 font-gaming mb-0.5">ЦЕНА</div>
-              <div className={`text-3xl font-black font-gaming ${
-                rarity === 'legendary' ? 'text-orange-400 drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]' :
-                rarity === 'epic' ? 'text-neon-purple drop-shadow-[0_0_15px_rgba(157,78,221,0.8)]' :
-                rarity === 'rare' ? 'text-blue-400 drop-shadow-[0_0_15px_rgba(96,165,250,0.8)]' :
-                'text-neon-red drop-shadow-[0_0_15px_rgba(255,0,51,0.8)]'
-              }`}>
+              <div className="text-3xl font-black font-gaming text-neon-red drop-shadow-[0_0_15px_rgba(255,0,51,0.8)]">
                 {price}₽
               </div>
             </div>
@@ -198,20 +175,7 @@ export default function ProductCard({
           <button
             onClick={onAddToCart}
             disabled={stock_count === 0}
-            className={`
-              w-full py-3 rounded-xl font-gaming text-sm font-black tracking-wider
-              transition-all duration-200 
-              disabled:opacity-50 disabled:cursor-not-allowed
-              flex items-center justify-center gap-2
-              ${rarity === 'legendary' 
-                ? 'bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 text-white shadow-[0_0_20px_rgba(249,115,22,0.6)] hover:shadow-[0_0_30px_rgba(249,115,22,0.8)] hover:scale-105' 
-                : rarity === 'epic'
-                ? 'bg-gradient-to-r from-neon-purple to-purple-600 text-white shadow-[0_0_20px_rgba(157,78,221,0.6)] hover:shadow-[0_0_30px_rgba(157,78,221,0.8)] hover:scale-105'
-                : rarity === 'rare'
-                ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-[0_0_20px_rgba(59,130,246,0.6)] hover:shadow-[0_0_30px_rgba(59,130,246,0.8)] hover:scale-105'
-                : 'bg-gradient-to-r from-neon-red to-neon-purple text-white shadow-neon-red hover:shadow-neon-purple hover:scale-105'
-              }
-            `}
+            className="w-full py-3 rounded-xl font-gaming text-sm font-black tracking-wider transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 bg-gradient-to-r from-neon-red to-neon-purple text-white shadow-[0_0_20px_rgba(255,0,51,0.6)] hover:shadow-[0_0_30px_rgba(255,0,51,0.8)] hover:scale-105"
           >
             <span className="text-lg">💎</span>
             КУПИТЬ СЕЙЧАС

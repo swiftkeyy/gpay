@@ -1,15 +1,20 @@
 """Catalog and search router."""
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+import logging
+
+from fastapi import APIRouter, Depends, Query, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
-from app.models import Game, Category, Product, Lot
+from app.models import Game, Category, Product, Lot, Seller
+from api.services.cache import get_cache_service
+from api.dependencies.auth import get_current_user
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Real game images mapping (Playerok-style)
 GAME_IMAGES = {
@@ -67,17 +72,37 @@ async def get_games(
     search: str | None = None,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get list of games with pagination and images."""
+    """Get list of games with pagination, search, and Redis caching (5-minute TTL)."""
+    # Generate cache key
+    cache_key = f"games:page={page}:limit={limit}:search={search or ''}"
+    
+    # Try to get from cache
+    cache = get_cache_service()
+    cached_data = await cache.get(cache_key)
+    if cached_data:
+        logger.info(f"Cache HIT for {cache_key}")
+        return cached_data
+    
+    logger.info(f"Cache MISS for {cache_key}")
+    
+    # Build query
     query = select(Game).where(Game.is_active == True)
     
     if search:
         query = query.where(Game.title.ilike(f"%{search}%"))
     
+    # Get total count for pagination
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await session.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    # Apply pagination and ordering
     query = query.order_by(Game.sort_order.asc()).offset((page - 1) * limit).limit(limit)
     result = await session.execute(query)
     games = result.scalars().all()
     
-    return {
+    # Build response
+    response_data = {
         "items": [
             {
                 "id": game.id,
@@ -89,10 +114,16 @@ async def get_games(
             }
             for game in games
         ],
-        "total": len(games),
+        "total": total,
         "page": page,
         "limit": limit,
+        "pages": (total + limit - 1) // limit if total > 0 else 0
     }
+    
+    # Cache the response
+    await cache.set(cache_key, response_data)
+    
+    return response_data
 
 
 @router.get("/games/{game_id}")
@@ -122,7 +153,20 @@ async def get_categories(
     game_id: int | None = None,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get list of categories."""
+    """Get hierarchical category structure with Redis caching (5-minute TTL)."""
+    # Generate cache key
+    cache_key = f"categories:game_id={game_id or 'all'}"
+    
+    # Try to get from cache
+    cache = get_cache_service()
+    cached_data = await cache.get(cache_key)
+    if cached_data:
+        logger.info(f"Cache HIT for {cache_key}")
+        return cached_data
+    
+    logger.info(f"Cache MISS for {cache_key}")
+    
+    # Build query
     query = select(Category).where(Category.is_active == True)
     
     if game_id:
@@ -132,40 +176,84 @@ async def get_categories(
     result = await session.execute(query)
     categories = result.scalars().all()
     
-    return [
-        {
-            "id": cat.id,
-            "name": cat.title,
-            "slug": cat.slug,
-            "game_id": cat.game_id
-        }
-        for cat in categories
-    ]
+    # Build hierarchical structure
+    # Note: Current schema doesn't have parent_id, so we return flat list
+    # If parent_id is added later, we can build tree structure here
+    response_data = {
+        "items": [
+            {
+                "id": cat.id,
+                "name": cat.title,
+                "slug": cat.slug,
+                "game_id": cat.game_id,
+                "description": cat.description,
+                "is_active": cat.is_active
+            }
+            for cat in categories
+        ],
+        "total": len(categories)
+    }
+    
+    # Cache the response
+    await cache.set(cache_key, response_data)
+    
+    return response_data
 
 
 @router.get("/products", response_model=list[ProductResponse])
 async def get_products(
+    game_id: int | None = None,
     category_id: int | None = None,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=50),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get list of products."""
+    """Get list of products with filters and Redis caching (5-minute TTL)."""
+    # Generate cache key
+    cache_key = f"products:game_id={game_id or 'all'}:category_id={category_id or 'all'}:page={page}:limit={limit}"
+    
+    # Try to get from cache
+    cache = get_cache_service()
+    cached_data = await cache.get(cache_key)
+    if cached_data:
+        logger.info(f"Cache HIT for {cache_key}")
+        return cached_data
+    
+    logger.info(f"Cache MISS for {cache_key}")
+    
+    # Build query
     query = select(Product).where(Product.is_active == True)
     
+    if game_id:
+        query = query.where(Product.game_id == game_id)
     if category_id:
         query = query.where(Product.category_id == category_id)
     
+    # Get total count
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await session.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    # Apply pagination
+    query = query.order_by(Product.sort_order.asc()).offset((page - 1) * limit).limit(limit)
     result = await session.execute(query)
     products = result.scalars().all()
     
-    return [
+    # Build response
+    response_data = [
         ProductResponse(
             id=prod.id,
             title=prod.title,
             description=prod.description,
             category_id=prod.category_id
-        )
+        ).model_dump()
         for prod in products
     ]
+    
+    # Cache the response
+    await cache.set(cache_key, response_data)
+    
+    return response_data
 
 
 @router.get("/lots")
@@ -175,103 +263,158 @@ async def search_lots(
     min_price: float | None = None,
     max_price: float | None = None,
     delivery_type: str | None = None,
+    min_seller_rating: float | None = None,
     sort: str = "popularity",
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Search lots with filters and sorting (Playerok-style)."""
-    import logging
-    from app.models import Price
+    """Search lots with filters and sorting.
     
-    logger = logging.getLogger(__name__)
-    logger.info(f"Fetching lots: game_id={game_id}, category_id={category_id}, page={page}, limit={limit}")
+    Filters:
+    - game_id: Filter by game
+    - category_id: Filter by category
+    - min_price: Minimum price
+    - max_price: Maximum price
+    - delivery_type: Filter by delivery type (auto, manual, coordinates)
+    - min_seller_rating: Minimum seller rating
     
-    # Query products with their prices
-    query = select(Product).where(Product.is_active == True)
+    Sorting:
+    - popularity: Sort by boosted status, featured status, and sales count (default)
+    - price_asc: Sort by price ascending
+    - price_desc: Sort by price descending
+    - newest: Sort by creation date descending
+    - rating: Sort by seller rating descending
     
+    **Validates Requirements 22.3**: Prioritizes boosted lots in search results.
+    Boosted lots (with boosted_until > current_time) appear first in all sort modes.
+    """
+    from app.models import Seller
+    from sqlalchemy.orm import joinedload
+    from datetime import datetime
+    
+    logger.info(f"Searching lots: game_id={game_id}, category_id={category_id}, min_price={min_price}, "
+                f"max_price={max_price}, delivery_type={delivery_type}, min_seller_rating={min_seller_rating}, "
+                f"sort={sort}, page={page}, limit={limit}")
+    
+    # Build query for lots with joins
+    query = select(Lot).join(Lot.seller).join(Lot.product).options(
+        joinedload(Lot.seller),
+        joinedload(Lot.product)
+    ).where(
+        Lot.is_deleted == False,
+        Lot.status == "active"
+    )
+    
+    # Apply filters
     if game_id:
         query = query.where(Product.game_id == game_id)
+    
     if category_id:
         query = query.where(Product.category_id == category_id)
     
-    # Sorting
-    if sort == "price_asc":
-        query = query.order_by(Product.sort_order.asc())
-    elif sort == "price_desc":
-        query = query.order_by(Product.sort_order.desc())
-    elif sort == "newest":
-        query = query.order_by(Product.created_at.desc())
-    else:  # popularity
-        query = query.order_by(Product.is_featured.desc(), Product.sort_order.asc())
+    if min_price is not None:
+        query = query.where(Lot.price >= min_price)
     
+    if max_price is not None:
+        query = query.where(Lot.price <= max_price)
+    
+    if delivery_type:
+        query = query.where(Lot.delivery_type == delivery_type)
+    
+    if min_seller_rating is not None:
+        query = query.where(Seller.rating >= min_seller_rating)
+    
+    # Apply sorting with boosted lots prioritized (Requirement 22.3)
+    # Boosted lots (boosted_until > now) always appear first
+    now = datetime.utcnow()
+    
+    # Create a case expression for boost priority
+    # 1 if boosted and not expired, 0 otherwise
+    from sqlalchemy import case
+    boost_priority = case(
+        (Lot.boosted_until > now, 1),
+        else_=0
+    )
+    
+    if sort == "price_asc":
+        query = query.order_by(boost_priority.desc(), Lot.price.asc())
+    elif sort == "price_desc":
+        query = query.order_by(boost_priority.desc(), Lot.price.desc())
+    elif sort == "newest":
+        query = query.order_by(boost_priority.desc(), Lot.created_at.desc())
+    elif sort == "rating":
+        query = query.order_by(boost_priority.desc(), Seller.rating.desc())
+    else:  # popularity (default)
+        query = query.order_by(boost_priority.desc(), Lot.is_featured.desc(), Lot.sold_count.desc())
+    
+    # Get total count for pagination
+    count_query = select(func.count()).select_from(query.subquery())
+    total_result = await session.execute(count_query)
+    total = total_result.scalar() or 0
+    
+    # Apply pagination
     query = query.offset((page - 1) * limit).limit(limit)
     result = await session.execute(query)
-    products = result.scalars().all()
+    lots = result.scalars().all()
     
-    logger.info(f"Found {len(products)} products")
+    logger.info(f"Found {len(lots)} lots (total: {total})")
     
-    # Get prices for products
+    # Build response
     items = []
-    for product in products:
-        logger.info(f"Processing product: id={product.id}, title={product.title}")
-        
-        # Get active price
-        price_result = await session.execute(
-            select(Price).where(
-                Price.product_id == product.id,
-                Price.is_active == True
-            ).limit(1)
-        )
-        price = price_result.scalar_one_or_none()
-        
-        # Get game info for image
+    for lot in lots:
+        # Get game info for images
         game_result = await session.execute(
-            select(Game).where(Game.id == product.game_id)
+            select(Game).where(Game.id == lot.product.game_id)
         )
         game = game_result.scalar_one_or_none()
         
-        if price:
-            logger.info(f"Found price for product {product.id}: {price.base_price} {price.currency_code}")
-            
-            # Use game-specific images (Playerok-style)
-            game_slug = game.slug if game else "default"
-            game_image = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
-            
-            # Generate product-specific images based on game
+        # Use game-specific images
+        game_slug = game.slug if game else "default"
+        game_image = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
+        
+        # Get lot images or use game image as fallback
+        image_urls = []
+        if lot.images:
+            # TODO: Get actual image URLs from media_files table
+            image_urls = [game_image]  # Fallback for now
+        else:
             image_urls = [
                 game_image,
-                f"https://picsum.photos/seed/{product.id}-2/400/400",
-                f"https://picsum.photos/seed/{product.id}-3/400/400",
+                f"https://picsum.photos/seed/{lot.id}-2/400/400",
+                f"https://picsum.photos/seed/{lot.id}-3/400/400",
             ]
-            
-            items.append({
-                "id": product.id,
-                "title": product.title or "Без названия",
-                "description": product.description or "",
-                "price": float(price.base_price) if price.base_price else 0.0,
-                "currency_code": price.currency_code or "RUB",
-                "images": image_urls,
-                "game_slug": game_slug,
-                "game_name": game.title if game else "Unknown",
-                "game_image_url": game_image,
-                "seller_name": "Game Pay",
-                "seller_rating": 5.0,
-                "rating": 5.0,
-                "delivery_type": "auto" if product.fulfillment_type.value == "auto" else "manual",
-                "stock_count": 999,
-                "is_featured": product.is_featured or False,
-            })
-        else:
-            logger.warning(f"No price found for product {product.id}")
-    
-    logger.info(f"Returning {len(items)} items")
+        
+        # Check if lot is currently boosted (Requirement 22.3)
+        is_boosted = lot.boosted_until is not None and lot.boosted_until > now
+        
+        items.append({
+            "id": lot.id,
+            "title": lot.title,
+            "description": lot.description or "",
+            "price": float(lot.price),
+            "currency_code": lot.currency_code,
+            "images": image_urls,
+            "game_slug": game_slug,
+            "game_name": game.title if game else "Unknown",
+            "game_image_url": game_image,
+            "seller_id": lot.seller_id,
+            "seller_name": lot.seller.shop_name,
+            "seller_rating": float(lot.seller.rating),
+            "delivery_type": lot.delivery_type.value,
+            "stock_count": lot.stock_count - lot.reserved_count,
+            "is_featured": lot.is_featured,
+            "is_boosted": is_boosted,
+            "boosted_until": lot.boosted_until.isoformat() if lot.boosted_until else None,
+            "status": lot.status.value,
+        })
     
     return {
         "items": items,
-        "total": len(items),
+        "total": total,
         "page": page,
         "limit": limit,
+        "pages": (total + limit - 1) // limit if total > 0 else 0
     }
 
 
@@ -280,94 +423,108 @@ async def get_lot(
     lot_id: int,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get lot details (Playerok-style with game info)."""
-    import logging
-    logger = logging.getLogger(__name__)
+    """Get lot details with full information."""
+    from sqlalchemy.orm import joinedload
+    from app.models import Seller
     
-    # Get product (we're using products as lots)
+    # Get lot with relationships
     result = await session.execute(
-        select(Product).where(Product.id == lot_id, Product.is_active == True)
+        select(Lot)
+        .options(
+            joinedload(Lot.seller),
+            joinedload(Lot.product),
+            joinedload(Lot.images)
+        )
+        .where(Lot.id == lot_id, Lot.is_deleted == False)
     )
-    product = result.scalar_one_or_none()
+    lot = result.scalar_one_or_none()
     
-    if not product:
+    if not lot:
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Lot not found")
     
-    # Get active price
-    price_result = await session.execute(
-        select(Price).where(
-            Price.product_id == product.id,
-            Price.is_active == True
-        ).limit(1)
-    )
-    price = price_result.scalar_one_or_none()
-    
-    if not price:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Price not found for this product")
-    
     # Get game info
     game_result = await session.execute(
-        select(Game).where(Game.id == product.game_id)
+        select(Game).where(Game.id == lot.product.game_id)
     )
     game = game_result.scalar_one_or_none()
     
     # Get category info
     category_result = await session.execute(
-        select(Category).where(Category.id == product.category_id)
+        select(Category).where(Category.id == lot.product.category_id)
     )
     category = category_result.scalar_one_or_none()
     
-    # Use game-specific images (Playerok-style)
+    # Use game-specific images
     game_slug = game.slug if game else "default"
     game_image = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
     
-    # Generate product-specific images
-    image_urls = [
-        game_image,
-        f"https://picsum.photos/seed/{product.id}-2/400/400",
-        f"https://picsum.photos/seed/{product.id}-3/400/400",
-    ]
+    # Get lot images or use game image as fallback
+    image_urls = []
+    if lot.images:
+        # TODO: Get actual image URLs from media_files table
+        image_urls = [game_image]  # Fallback for now
+    else:
+        image_urls = [
+            game_image,
+            f"https://picsum.photos/seed/{lot.id}-2/400/400",
+            f"https://picsum.photos/seed/{lot.id}-3/400/400",
+        ]
+    
+    # Calculate available stock
+    available_stock = lot.stock_count - lot.reserved_count
     
     return {
-        "id": product.id,
-        "title": product.title or "Без названия",
-        "description": product.description or "",
-        "price": float(price.base_price) if price.base_price else 0.0,
-        "currency_code": price.currency_code or "RUB",
+        "id": lot.id,
+        "title": lot.title,
+        "description": lot.description or "",
+        "price": float(lot.price),
+        "currency_code": lot.currency_code,
         "images": image_urls,
         "game_slug": game_slug,
         "game_name": game.title if game else "Unknown",
         "game_image_url": game_image,
         "category_name": category.title if category else "Unknown",
-        "seller_name": "Game Pay",
-        "seller_id": 1,
-        "seller_rating": 5.0,
-        "seller_total_sales": 1000,
-        "rating": 5.0,
-        "total_reviews": 150,
-        "delivery_type": "auto" if product.fulfillment_type.value == "auto" else "manual",
-        "delivery_time_minutes": 5 if product.fulfillment_type.value == "auto" else None,
-        "stock_count": 999,
-        "is_featured": product.is_featured or False,
-        "status": "active"
+        "seller_id": lot.seller_id,
+        "seller_name": lot.seller.shop_name,
+        "seller_rating": float(lot.seller.rating),
+        "seller_total_sales": lot.seller.total_sales,
+        "seller_is_verified": lot.seller.is_verified,
+        "delivery_type": lot.delivery_type.value,
+        "delivery_time_minutes": lot.delivery_time_minutes,
+        "stock_count": available_stock,
+        "is_featured": lot.is_featured,
+        "status": lot.status.value,
+        "created_at": lot.created_at.isoformat(),
+        "updated_at": lot.updated_at.isoformat() if lot.updated_at else None,
     }
 
 
 @router.post("/lots/{lot_id}/favorite")
 async def add_to_favorites(
     lot_id: int,
-    user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db_session),
+    current_user = Depends(get_current_user)
 ):
-    """Add lot to favorites."""
+    """Add lot to favorites.
+    
+    **Validates Requirements 21.1**: Creates favorite record with user ID and lot ID.
+    """
     from app.models import Favorite
     
-    # Check if already favorited
+    # Check if lot exists
+    lot_result = await session.execute(
+        select(Lot).where(Lot.id == lot_id, Lot.is_deleted == False)
+    )
+    lot = lot_result.scalar_one_or_none()
+    
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+    
+    # Check if already favorited (duplicate check as per requirement 21.1)
     result = await session.execute(
         select(Favorite).where(
-            Favorite.user_id == user_id,
+            Favorite.user_id == current_user.id,
             Favorite.lot_id == lot_id
         )
     )
@@ -376,7 +533,7 @@ async def add_to_favorites(
     if existing:
         return {"message": "Already in favorites"}
     
-    favorite = Favorite(user_id=user_id, lot_id=lot_id)
+    favorite = Favorite(user_id=current_user.id, lot_id=lot_id)
     session.add(favorite)
     await session.commit()
     
@@ -386,16 +543,19 @@ async def add_to_favorites(
 @router.delete("/lots/{lot_id}/favorite")
 async def remove_from_favorites(
     lot_id: int,
-    user_id: int = 1,  # TODO: Extract from auth token
-    session: AsyncSession = Depends(get_db_session)
+    session: AsyncSession = Depends(get_db_session),
+    current_user = Depends(get_current_user)
 ):
-    """Remove lot from favorites."""
+    """Remove lot from favorites.
+    
+    **Validates Requirements 21.2**: Deletes the favorite record.
+    """
     from app.models import Favorite
     from sqlalchemy import delete
     
     await session.execute(
         delete(Favorite).where(
-            Favorite.user_id == user_id,
+            Favorite.user_id == current_user.id,
             Favorite.lot_id == lot_id
         )
     )

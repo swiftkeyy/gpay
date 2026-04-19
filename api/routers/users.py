@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db_session
 from app.repositories.users import UserRepository
+from app.models.entities import User
+from api.dependencies.auth import get_current_user
 
 router = APIRouter()
 
@@ -29,117 +31,116 @@ class UpdateProfileRequest(BaseModel):
 
 
 @router.get("/me", response_model=UserProfileResponse)
-async def get_current_user(
-    user_id: int = 1,  # TODO: Extract from auth token
+async def get_current_user_profile(
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get current user profile."""
+    """Get current user profile.
+    
+    **Validates Requirements 2.1**: Returns user ID, Telegram ID, username, balance, 
+    referral code, language preference, and creation date.
+    """
     from sqlalchemy import select
     from app.models import Admin, Seller
     
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_id(user_id)
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
     # Check if user is admin
     result = await session.execute(
-        select(Admin).where(Admin.user_id == user_id)
+        select(Admin).where(Admin.user_id == current_user.id)
     )
     is_admin = result.scalar_one_or_none() is not None
     
     # Check if user is seller
     result = await session.execute(
-        select(Seller).where(Seller.user_id == user_id)
+        select(Seller).where(Seller.user_id == current_user.id)
     )
     is_seller = result.scalar_one_or_none() is not None
     
     return UserProfileResponse(
-        id=user.id,
-        telegram_id=user.telegram_id,
-        username=user.username,
-        first_name=user.first_name,
-        balance=float(user.balance),
-        referral_code=user.referral_code,
-        language_code=user.language_code or "ru",
+        id=current_user.id,
+        telegram_id=current_user.telegram_id,
+        username=current_user.username,
+        first_name=current_user.first_name,
+        balance=float(current_user.balance),
+        referral_code=current_user.referral_code,
+        language_code=current_user.language_code or "ru",
         is_admin=is_admin,
         is_seller=is_seller,
-        created_at=user.created_at.isoformat()
+        created_at=current_user.created_at.isoformat()
     )
 
 
 @router.patch("/me", response_model=UserProfileResponse)
-async def update_current_user(
+async def update_current_user_profile(
     request: UpdateProfileRequest,
-    user_id: int = 1,  # TODO: Extract from auth token
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Update current user profile."""
+    """Update current user profile.
+    
+    **Validates Requirements 2.2**: Saves new language code and returns updated profile.
+    """
     from sqlalchemy import select
     from app.models import Admin, Seller
     
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_id(user_id)
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
     if request.language_code:
-        user.language_code = request.language_code
+        current_user.language_code = request.language_code
     
     await session.commit()
-    await session.refresh(user)
+    await session.refresh(current_user)
     
     # Check if user is admin
     result = await session.execute(
-        select(Admin).where(Admin.user_id == user_id)
+        select(Admin).where(Admin.user_id == current_user.id)
     )
     is_admin = result.scalar_one_or_none() is not None
     
     # Check if user is seller
     result = await session.execute(
-        select(Seller).where(Seller.user_id == user_id)
+        select(Seller).where(Seller.user_id == current_user.id)
     )
     is_seller = result.scalar_one_or_none() is not None
     
     return UserProfileResponse(
-        id=user.id,
-        telegram_id=user.telegram_id,
-        username=user.username,
-        first_name=user.first_name,
-        balance=float(user.balance),
-        referral_code=user.referral_code,
-        language_code=user.language_code or "ru",
+        id=current_user.id,
+        telegram_id=current_user.telegram_id,
+        username=current_user.username,
+        first_name=current_user.first_name,
+        balance=float(current_user.balance),
+        referral_code=current_user.referral_code,
+        language_code=current_user.language_code or "ru",
         is_admin=is_admin,
         is_seller=is_seller,
-        created_at=user.created_at.isoformat()
+        created_at=current_user.created_at.isoformat()
     )
 
 
 @router.get("/me/balance")
-async def get_balance(
-    user_id: int = 1,  # TODO: Extract from auth token
+async def get_user_balance(
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get user balance."""
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_id(user_id)
+    """Get user balance.
     
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    
-    return {"balance": float(user.balance), "currency": "RUB"}
+    **Validates Requirements 2.3**: Returns current balance with two decimal precision.
+    """
+    return {
+        "balance": float(current_user.balance),
+        "currency": "RUB"
+    }
 
 
 @router.get("/me/transactions")
-async def get_transactions(
-    user_id: int = 1,  # TODO: Extract from auth token
+async def get_user_transactions(
+    current_user: User = Depends(get_current_user),
     page: int = 1,
     limit: int = 20,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get user transaction history."""
+    """Get user transaction history.
+    
+    **Validates Requirements 2.4**: Returns paginated list of transactions with type, 
+    amount, status, and timestamp.
+    """
     from sqlalchemy import select, func
     from app.models import Transaction
     
@@ -151,7 +152,7 @@ async def get_transactions(
     # Get transactions
     result = await session.execute(
         select(Transaction)
-        .where(Transaction.user_id == user_id)
+        .where(Transaction.user_id == current_user.id)
         .order_by(Transaction.created_at.desc())
         .offset(offset)
         .limit(limit)
@@ -160,7 +161,7 @@ async def get_transactions(
     
     # Get total count
     result = await session.execute(
-        select(func.count(Transaction.id)).where(Transaction.user_id == user_id)
+        select(func.count(Transaction.id)).where(Transaction.user_id == current_user.id)
     )
     total = result.scalar() or 0
     
@@ -184,23 +185,17 @@ async def get_transactions(
 
 
 @router.get("/me/referrals")
-async def get_referrals(
-    user_id: int = 1,  # TODO: Extract from auth token
+async def get_user_referrals(
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session)
 ):
     """Get referral stats."""
     from sqlalchemy import select, func
-    from app.models import User
-    
-    user_repo = UserRepository(session)
-    user = await user_repo.get_by_id(user_id)
-    
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+    from app.models import User as UserModel
     
     # Get total referrals count
     result = await session.execute(
-        select(func.count(User.id)).where(User.referred_by_id == user_id)
+        select(func.count(UserModel.id)).where(UserModel.referred_by_id == current_user.id)
     )
     total_referrals = result.scalar() or 0
     
@@ -210,14 +205,122 @@ async def get_referrals(
     
     result = await session.execute(
         select(func.coalesce(func.sum(Transaction.amount), 0)).where(
-            Transaction.user_id == user_id,
+            Transaction.user_id == current_user.id,
             Transaction.transaction_type == TransactionType.REFERRAL_REWARD
         )
     )
     total_earned = float(result.scalar() or 0)
     
     return {
-        "referral_code": user.referral_code,
+        "referral_code": current_user.referral_code,
         "total_referrals": total_referrals,
         "total_earned": total_earned
+    }
+
+
+
+@router.get("/me/favorites")
+async def get_user_favorites(
+    current_user: User = Depends(get_current_user),
+    page: int = 1,
+    limit: int = 20,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Get user's favorite lots.
+    
+    **Validates Requirements 21.3**: Returns all favorited lots with current price and availability.
+    """
+    from sqlalchemy import select, func
+    from app.models import Favorite, Lot, Seller, LotImage, MediaFile
+    from sqlalchemy.orm import selectinload
+    
+    if limit > 100:
+        limit = 100
+    
+    offset = (page - 1) * limit
+    
+    # Get favorites with lot details
+    result = await session.execute(
+        select(Favorite)
+        .where(Favorite.user_id == current_user.id)
+        .order_by(Favorite.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    favorites = result.scalars().all()
+    
+    # Get total count
+    result = await session.execute(
+        select(func.count(Favorite.id)).where(Favorite.user_id == current_user.id)
+    )
+    total = result.scalar() or 0
+    
+    # Fetch lot details for each favorite
+    lot_ids = [fav.lot_id for fav in favorites]
+    
+    if not lot_ids:
+        return {
+            "items": [],
+            "total": total,
+            "page": page,
+            "limit": limit
+        }
+    
+    # Get lots with seller and images
+    lots_result = await session.execute(
+        select(Lot)
+        .where(Lot.id.in_(lot_ids))
+        .options(
+            selectinload(Lot.seller),
+            selectinload(Lot.images).selectinload(LotImage.media)
+        )
+    )
+    lots_dict = {lot.id: lot for lot in lots_result.scalars().all()}
+    
+    # Build response with lot details
+    items = []
+    for favorite in favorites:
+        lot = lots_dict.get(favorite.lot_id)
+        if not lot:
+            continue
+        
+        # Get first image
+        image_url = None
+        if lot.images:
+            sorted_images = sorted(lot.images, key=lambda img: img.sort_order)
+            if sorted_images:
+                image_url = sorted_images[0].media.url
+        
+        # Check availability
+        is_available = (
+            lot.status.value == "active" and 
+            not lot.is_deleted and
+            (lot.delivery_type.value == "manual" or lot.stock_count > 0)
+        )
+        
+        items.append({
+            "favorite_id": favorite.id,
+            "lot_id": lot.id,
+            "title": lot.title,
+            "description": lot.description,
+            "price": float(lot.price),
+            "currency_code": lot.currency_code,
+            "delivery_type": lot.delivery_type.value,
+            "stock_count": lot.stock_count,
+            "status": lot.status.value,
+            "is_available": is_available,
+            "image_url": image_url,
+            "seller": {
+                "id": lot.seller.id,
+                "shop_name": lot.seller.shop_name,
+                "rating": float(lot.seller.rating) if lot.seller.rating else 0.0
+            },
+            "favorited_at": favorite.created_at.isoformat()
+        })
+    
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "limit": limit
     }

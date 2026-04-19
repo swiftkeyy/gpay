@@ -7,19 +7,46 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from redis.asyncio import Redis
 
 from app.core.config import get_settings
 from api.routers import auth, users, catalog, orders, deals, sellers, reviews, admin, payments, notifications, chat, cart
+from api.middleware import LoggingMiddleware, RateLimitMiddleware
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+
+# Redis client for rate limiting
+redis_client: Redis | None = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan context manager for startup/shutdown events."""
+    global redis_client
+    
     logger.info("🚀 Starting FastAPI application...")
+    
+    # Initialize Redis client for rate limiting
+    try:
+        redis_client = Redis.from_url(
+            settings.redis_url,
+            encoding="utf-8",
+            decode_responses=True
+        )
+        await redis_client.ping()
+        logger.info("✅ Redis connected for rate limiting")
+    except Exception as exc:
+        logger.warning(f"⚠️ Redis connection failed: {exc}. Rate limiting will be disabled.")
+        redis_client = None
+    
     yield
+    
+    # Cleanup
+    if redis_client:
+        await redis_client.close()
+        logger.info("✅ Redis connection closed")
+    
     logger.info("👋 Shutting down FastAPI application...")
 
 
@@ -50,6 +77,12 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Logging middleware (validates requirement 29.4 - anonymize PII in logs)
+app.add_middleware(LoggingMiddleware)
+
+# Rate limiting middleware (validates requirement 29.5 - 10 requests/minute per user)
+app.add_middleware(RateLimitMiddleware, redis_client=redis_client, requests_per_minute=10)
 
 
 # Health check endpoint

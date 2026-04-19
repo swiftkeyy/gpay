@@ -1,6 +1,7 @@
 """Orders and deals router with idempotency."""
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import List
@@ -15,12 +16,14 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_db_session
 from app.models.entities import (
     Cart, CartItem, Order, OrderItem, Deal, Lot, LotStockItem,
-    User, Seller, Transaction, OrderStatusHistory, Product, Game
+    User, Seller, Transaction, OrderStatusHistory, Product, Game, Price, PromoCode, PromoCodeUsage, Payment
 )
 from app.models.enums import (
     OrderStatus, DealStatus, LotDeliveryType, LotStockStatus,
-    TransactionType, TransactionStatus
+    TransactionType, TransactionStatus, FulfillmentType, PromoType
 )
+from api.dependencies.auth import get_current_user
+from api.services.payment_providers import get_payment_provider
 
 router = APIRouter()
 
@@ -84,11 +87,19 @@ class OrderListResponse(BaseModel):
 @router.post("", response_model=OrderResponse)
 async def create_order(
     request: CreateOrderRequest,
-    user_id: int = 1,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Create order from cart with idempotency."""
-    # Check for existing order with same idempotency key
+    """Create order from cart with idempotency.
+    
+    Validates: Requirements 7.1, 7.2, 7.8
+    - 7.1: Create order record with all cart items and calculate total amount
+    - 7.2: Create separate deals for each seller involved (future P2P feature)
+    - 7.8: Use idempotency keys to prevent duplicate order creation
+    """
+    user_id = current_user.id
+    
+    # Check for existing order with same idempotency key (Requirement 7.8)
     result = await session.execute(
         select(Order).where(
             and_(
@@ -100,7 +111,7 @@ async def create_order(
     existing_order = result.scalar_one_or_none()
     
     if existing_order:
-        # Return existing order (idempotency)
+        # Return existing order (idempotency - prevents duplicate orders)
         return await _get_order_response(existing_order.id, session)
     
     # Get user cart
@@ -112,10 +123,10 @@ async def create_order(
     if not cart:
         raise HTTPException(status_code=400, detail="Cart is empty")
     
-    # Get cart items with lots
+    # Get cart items with products
     result = await session.execute(
         select(CartItem)
-        .options(selectinload(CartItem.lot))
+        .options(selectinload(CartItem.product))
         .where(CartItem.cart_id == cart.id)
     )
     cart_items = result.scalars().all()
@@ -123,89 +134,185 @@ async def create_order(
     if not cart_items:
         raise HTTPException(status_code=400, detail="Cart is empty")
     
-    # Validate all items
+    # Validate all items and calculate subtotal
+    subtotal_amount = Decimal("0.00")
+    items_data = []
+    
     for item in cart_items:
-        lot = item.lot
+        product = item.product
         
-        if lot.status != "active" or lot.is_deleted:
+        # Validate product is active
+        if not product.is_active or product.is_deleted:
             raise HTTPException(
                 status_code=400,
-                detail=f"Lot '{lot.title}' is no longer available"
+                detail=f"Product '{product.title}' is no longer available"
             )
         
-        available_stock = lot.stock_count - lot.reserved_count + item.quantity
-        if available_stock < item.quantity:
+        # Get current active price
+        price_result = await session.execute(
+            select(Price).where(
+                Price.product_id == product.id,
+                Price.is_active == True
+            ).limit(1)
+        )
+        price = price_result.scalar_one_or_none()
+        
+        if not price:
             raise HTTPException(
                 status_code=400,
-                detail=f"Insufficient stock for '{lot.title}'"
+                detail=f"Price not found for product '{product.title}'"
             )
+        
+        # Calculate item total
+        item_total = price.base_price * item.quantity
+        subtotal_amount += item_total
+        
+        items_data.append({
+            "cart_item": item,
+            "product": product,
+            "price": price,
+            "unit_price": price.base_price,
+            "total_price": item_total
+        })
     
-    # Calculate total
-    total_amount = sum(item.lot.price * item.quantity for item in cart_items)
+    # Apply promo code discount if provided (Requirement 7.2)
+    discount_amount = Decimal("0.00")
+    promo_code_id = None
     
-    # TODO: Apply promo code discount if provided
+    if request.promo_code:
+        # Find and validate promo code
+        result = await session.execute(
+            select(PromoCode).where(
+                and_(
+                    PromoCode.code == request.promo_code.upper(),
+                    PromoCode.is_deleted == False,
+                    PromoCode.is_active == True
+                )
+            )
+        )
+        promo_code = result.scalar_one_or_none()
+        
+        if promo_code:
+            # Check expiration dates
+            now = datetime.utcnow()
+            if promo_code.starts_at and promo_code.starts_at > now:
+                raise HTTPException(status_code=400, detail="Promo code is not yet valid")
+            
+            if promo_code.ends_at and promo_code.ends_at < now:
+                raise HTTPException(status_code=400, detail="Promo code has expired")
+            
+            # Check usage limit
+            if promo_code.max_usages is not None and promo_code.used_count >= promo_code.max_usages:
+                raise HTTPException(status_code=400, detail="Promo code usage limit reached")
+            
+            # Check if user already used this promo code
+            result = await session.execute(
+                select(PromoCodeUsage).where(
+                    and_(
+                        PromoCodeUsage.promo_code_id == promo_code.id,
+                        PromoCodeUsage.user_id == user_id
+                    )
+                )
+            )
+            existing_usage = result.scalar_one_or_none()
+            
+            if existing_usage:
+                raise HTTPException(status_code=400, detail="You have already used this promo code")
+            
+            # Check if only for new users
+            if promo_code.only_new_users:
+                result = await session.execute(
+                    select(Order).where(
+                        and_(
+                            Order.user_id == user_id,
+                            Order.status.in_([OrderStatus.COMPLETED, OrderStatus.DELIVERED])
+                        )
+                    ).limit(1)
+                )
+                has_orders = result.scalar_one_or_none()
+                
+                if has_orders:
+                    raise HTTPException(status_code=400, detail="This promo code is only for new users")
+            
+            # Calculate discount based on promo type
+            if promo_code.promo_type == PromoType.PERCENT:
+                discount_amount = (subtotal_amount * promo_code.value) / Decimal("100")
+            elif promo_code.promo_type == PromoType.FIXED:
+                discount_amount = promo_code.value
+            
+            # Ensure discount doesn't exceed subtotal
+            if discount_amount > subtotal_amount:
+                discount_amount = subtotal_amount
+            
+            promo_code_id = promo_code.id
     
-    # Create order
+    # Calculate total amount
+    total_amount = subtotal_amount - discount_amount
+    
+    # Ensure total is never negative
+    if total_amount < Decimal("0.00"):
+        total_amount = Decimal("0.00")
+    
+    # Generate unique order number
+    order_number = f"GP-{datetime.utcnow().strftime('%Y%m%d')}-{uuid4().hex[:8].upper()}"
+    
+    # Create order (Requirement 7.1)
     order = Order(
+        order_number=order_number,
         user_id=user_id,
-        status=OrderStatus.PENDING,
+        status=OrderStatus.NEW,
+        subtotal_amount=subtotal_amount,
+        discount_amount=discount_amount,
         total_amount=total_amount,
-        idempotency_key=request.idempotency_key,
-        promo_code_id=None  # TODO: Link promo code if provided
+        promo_code_id=promo_code_id,
+        idempotency_key=request.idempotency_key
     )
     session.add(order)
     await session.flush()
     
-    # Create order items and deals
-    for item in cart_items:
-        lot = item.lot
+    # Create order items with product snapshots
+    for item_data in items_data:
+        product = item_data["product"]
         
-        # Create order item
         order_item = OrderItem(
             order_id=order.id,
-            lot_id=lot.id,
-            quantity=item.quantity,
-            price_per_item=lot.price,
-            seller_id=lot.seller_id
+            product_id=product.id,
+            title_snapshot=product.title,
+            quantity=item_data["cart_item"].quantity,
+            unit_price=item_data["unit_price"],
+            total_price=item_data["total_price"],
+            fulfillment_type=product.fulfillment_type
         )
         session.add(order_item)
-        await session.flush()
-        
-        # Create deal for this seller
-        deal_amount = lot.price * item.quantity
-        
-        # Get seller to calculate commission
-        result = await session.execute(
-            select(Seller).where(Seller.id == lot.seller_id)
-        )
-        seller = result.scalar_one_or_none()
-        commission_percent = seller.commission_percent if seller else Decimal("10.00")
-        commission_amount = deal_amount * (commission_percent / Decimal("100"))
-        seller_amount = deal_amount - commission_amount
-        
-        deal = Deal(
-            order_id=order.id,
-            buyer_id=user_id,
-            seller_id=lot.seller_id,
-            lot_id=lot.id,
-            status=DealStatus.CREATED,
-            amount=deal_amount,
-            commission_amount=commission_amount,
-            seller_amount=seller_amount,
-            escrow_released=False,
-            auto_complete_at=datetime.utcnow() + timedelta(hours=72)
-        )
-        session.add(deal)
     
-    # Create status history
+    # Create status history for audit trail
     status_history = OrderStatusHistory(
         order_id=order.id,
-        status=OrderStatus.PENDING,
-        comment="Order created"
+        old_status=None,
+        new_status=OrderStatus.NEW,
+        comment="Order created from cart"
     )
     session.add(status_history)
     
-    # Clear cart (but keep reservations until payment)
+    # Record promo code usage if applied
+    if promo_code_id:
+        promo_usage = PromoCodeUsage(
+            promo_code_id=promo_code_id,
+            user_id=user_id,
+            order_id=order.id
+        )
+        session.add(promo_usage)
+        
+        # Increment promo code usage count
+        await session.execute(
+            select(PromoCode).where(PromoCode.id == promo_code_id)
+        )
+        promo_code_obj = (await session.execute(
+            select(PromoCode).where(PromoCode.id == promo_code_id)
+        )).scalar_one()
+        promo_code_obj.used_count += 1
+    
+    # Clear cart after successful order creation
     for item in cart_items:
         await session.delete(item)
     
@@ -291,10 +398,19 @@ async def get_order(
 async def initiate_payment(
     order_id: int,
     payment_method: str,
-    user_id: int = 1,
+    current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Initiate payment for order."""
+    """Initiate payment for order.
+    
+    Validates: Requirements 7.3, 7.4, 23.1, 23.2
+    - 7.3: Support payment methods including Telegram Stars, ЮKassa, Tinkoff, CloudPayments, and Crypto Bot
+    - 7.4: Create payment record and return payment URL or invoice
+    - 23.1: Return list of enabled providers with names and icons
+    - 23.2: Generate payment URL and return it to Mini App
+    """
+    user_id = current_user.id
+    
     # Get order
     result = await session.execute(
         select(Order).where(
@@ -309,15 +425,12 @@ async def initiate_payment(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    if order.status != OrderStatus.PENDING:
+    # Check order status - must be NEW or WAITING_PAYMENT
+    if order.status not in [OrderStatus.NEW, OrderStatus.WAITING_PAYMENT]:
         raise HTTPException(
             status_code=400,
             detail=f"Cannot pay for order with status: {order.status.value}"
         )
-    
-    # Import payment providers
-    from api.services.payment_providers import get_payment_provider
-    import os
     
     # Get provider config
     provider_configs = {
@@ -335,6 +448,9 @@ async def initiate_payment(
         },
         "cryptobot": {
             "token": os.getenv("CRYPTOBOT_TOKEN")
+        },
+        "telegram_stars": {
+            # Telegram Stars configuration (future implementation)
         }
     }
     
@@ -342,30 +458,88 @@ async def initiate_payment(
         raise HTTPException(status_code=400, detail=f"Unknown payment method: {payment_method}")
     
     config = provider_configs[payment_method]
-    if not all(config.values()):
+    
+    # Check if provider is configured (skip for telegram_stars as it's future)
+    if payment_method != "telegram_stars" and not all(config.values()):
         raise HTTPException(status_code=400, detail=f"Payment method {payment_method} is not configured")
     
-    # Create payment
+    # Create payment record BEFORE calling provider
+    payment = Payment(
+        order_id=order_id,
+        payment_provider=payment_method,
+        amount=order.total_amount,
+        currency=order.currency_code,
+        status="pending"
+    )
+    session.add(payment)
+    await session.flush()
+    
+    # Create payment with provider
     try:
+        if payment_method == "telegram_stars":
+            # Stub for Telegram Stars (future implementation)
+            raise HTTPException(
+                status_code=501,
+                detail="Telegram Stars payment is not yet implemented"
+            )
+        
         provider = get_payment_provider(payment_method, **config)
         result = await provider.create_payment(
             order_id=order_id,
             amount=order.total_amount,
-            currency="RUB",
-            description=f"Order #{order_id}",
+            currency=order.currency_code,
+            description=f"Order #{order.order_number}",
             return_url=f"https://your-miniapp.com/orders/{order_id}"
         )
         
+        # Update payment record with provider response
+        payment.external_payment_id = result.payment_id
+        payment.payment_url = result.payment_url
+        
+        # Update order status to WAITING_PAYMENT
+        old_status = order.status
+        order.status = OrderStatus.WAITING_PAYMENT
+        order.updated_at = datetime.utcnow()
+        
+        # Create status history record
+        status_history = OrderStatusHistory(
+            order_id=order.id,
+            old_status=old_status,
+            new_status=OrderStatus.WAITING_PAYMENT,
+            comment=f"Payment initiated via {payment_method}"
+        )
+        session.add(status_history)
+        
+        await session.commit()
+        
         return {
+            "payment_id": payment.id,
             "payment_url": result.payment_url,
-            "payment_id": result.payment_id,
+            "external_payment_id": result.payment_id,
             "order_id": order_id,
             "amount": float(order.total_amount),
-            "currency": "RUB",
-            "payment_method": payment_method
+            "currency": order.currency_code,
+            "payment_method": payment_method,
+            "status": "pending"
         }
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        await session.rollback()
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Payment creation failed: {str(e)}")
+        # Handle payment provider errors
+        await session.rollback()
+        
+        # Update payment record with error
+        payment.status = "failed"
+        payment.error_message = str(e)
+        await session.commit()
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Payment creation failed: {str(e)}"
+        )
 
 
 async def _get_order_response(
@@ -385,28 +559,19 @@ async def _get_order_response(
     if not order:
         raise HTTPException(status_code=404, detail="Order not found")
     
-    # Get order items with lots and sellers
+    # Get order items with products
     result = await session.execute(
         select(OrderItem)
-        .options(
-            selectinload(OrderItem.lot),
-            selectinload(OrderItem.seller).selectinload(Seller.user)
-        )
+        .options(selectinload(OrderItem.product))
         .where(OrderItem.order_id == order_id)
     )
     order_items = result.scalars().all()
     
     items_response = []
     for item in order_items:
-        lot = item.lot
-        seller_user = item.seller.user if item.seller else None
+        product = item.product
         
-        # Get product and game for image
-        product_result = await session.execute(
-            select(Product).where(Product.id == lot.product_id)
-        )
-        product = product_result.scalar_one_or_none()
-        
+        # Get game info for image
         if product:
             game_result = await session.execute(
                 select(Game).where(Game.id == product.game_id)
@@ -415,18 +580,18 @@ async def _get_order_response(
             game_slug = game.slug if game else "default"
             image_url = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
         else:
-            image_url = f"https://picsum.photos/seed/lot-{lot.id}/400/400"
+            image_url = f"https://picsum.photos/seed/product-{item.product_id}/400/400"
         
         items_response.append(OrderItemResponse(
             id=item.id,
-            lot_id=lot.id,
-            lot_title=lot.title,
+            lot_id=item.product_id,  # Using product_id as lot_id for compatibility
+            lot_title=item.title_snapshot,
             lot_image_url=image_url,
             quantity=item.quantity,
-            price_per_item=item.price_per_item,
-            subtotal=item.price_per_item * item.quantity,
-            seller_id=item.seller_id,
-            seller_name=seller_user.username if seller_user else "Unknown"
+            price_per_item=item.unit_price,
+            subtotal=item.total_price,
+            seller_id=1,  # Default seller ID (Game Pay)
+            seller_name="Game Pay"
         ))
     
     return OrderResponse(

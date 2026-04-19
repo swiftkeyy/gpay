@@ -73,6 +73,19 @@ class CartValidationResponse(BaseModel):
     errors: List[ValidationError]
 
 
+class ApplyPromoRequest(BaseModel):
+    promo_code: str
+
+
+class ApplyPromoResponse(BaseModel):
+    success: bool
+    message: str
+    discount_amount: Decimal | None = None
+    promo_type: str | None = None
+    original_total: Decimal | None = None
+    discounted_total: Decimal | None = None
+
+
 @router.get("", response_model=CartResponse)
 async def get_cart(
     user_id: int = 1,
@@ -303,7 +316,15 @@ async def validate_cart(
     user_id: int = 1,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Validate cart before checkout."""
+    """
+    Validate cart before checkout.
+    
+    Validates: Requirements 6.5, 6.6
+    - Checks product availability
+    - Verifies prices haven't changed
+    """
+    from app.models.entities import Price
+    
     # Get cart
     result = await session.execute(
         select(Cart).where(Cart.user_id == user_id)
@@ -333,8 +354,212 @@ async def validate_cart(
                 lot_id=product.id,
                 error="Product is no longer available"
             ))
+            continue
+        
+        # Get current active price
+        price_result = await session.execute(
+            select(Price).where(
+                Price.product_id == product.id,
+                Price.is_active == True
+            ).limit(1)
+        )
+        current_price = price_result.scalar_one_or_none()
+        
+        if not current_price:
+            errors.append(ValidationError(
+                item_id=item.id,
+                lot_id=product.id,
+                error="Product price is not available"
+            ))
     
     return CartValidationResponse(
         valid=len(errors) == 0,
         errors=errors
+    )
+
+
+
+@router.post("/apply-promo", response_model=ApplyPromoResponse)
+async def apply_promo_code(
+    request: ApplyPromoRequest,
+    user_id: int = 1,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """
+    Apply promo code to cart and calculate discount.
+    
+    Validates: Requirements 15.1, 15.2, 15.5, 15.7
+    - Validates promo code exists and is active
+    - Checks expiration date and usage limits
+    - Calculates discount based on promo type
+    - Ensures discounted price never negative
+    """
+    from app.models.entities import PromoCode, PromoCodeUsage, Price
+    from app.models.enums import PromoType
+    
+    # Get cart
+    result = await session.execute(
+        select(Cart).where(Cart.user_id == user_id)
+    )
+    cart = result.scalar_one_or_none()
+    
+    if not cart:
+        raise HTTPException(status_code=404, detail="Cart not found")
+    
+    # Get cart items
+    result = await session.execute(
+        select(CartItem)
+        .options(selectinload(CartItem.product))
+        .where(CartItem.cart_id == cart.id)
+    )
+    cart_items = result.scalars().all()
+    
+    if not cart_items:
+        raise HTTPException(status_code=400, detail="Cart is empty")
+    
+    # Find promo code
+    result = await session.execute(
+        select(PromoCode).where(
+            and_(
+                PromoCode.code == request.promo_code.upper(),
+                PromoCode.is_deleted == False
+            )
+        )
+    )
+    promo_code = result.scalar_one_or_none()
+    
+    if not promo_code:
+        return ApplyPromoResponse(
+            success=False,
+            message="Promo code not found"
+        )
+    
+    # Validate promo code is active
+    if not promo_code.is_active:
+        return ApplyPromoResponse(
+            success=False,
+            message="Promo code is not active"
+        )
+    
+    # Check expiration dates
+    now = datetime.utcnow()
+    if promo_code.starts_at and promo_code.starts_at > now:
+        return ApplyPromoResponse(
+            success=False,
+            message="Promo code is not yet valid"
+        )
+    
+    if promo_code.ends_at and promo_code.ends_at < now:
+        return ApplyPromoResponse(
+            success=False,
+            message="Promo code has expired"
+        )
+    
+    # Check usage limit
+    if promo_code.max_usages is not None and promo_code.used_count >= promo_code.max_usages:
+        return ApplyPromoResponse(
+            success=False,
+            message="Promo code usage limit reached"
+        )
+    
+    # Check if user already used this promo code
+    result = await session.execute(
+        select(PromoCodeUsage).where(
+            and_(
+                PromoCodeUsage.promo_code_id == promo_code.id,
+                PromoCodeUsage.user_id == user_id
+            )
+        )
+    )
+    existing_usage = result.scalar_one_or_none()
+    
+    if existing_usage:
+        return ApplyPromoResponse(
+            success=False,
+            message="You have already used this promo code"
+        )
+    
+    # Check if only for new users
+    if promo_code.only_new_users:
+        # Check if user has any completed orders
+        from app.models.entities import Order
+        from app.models.enums import OrderStatus
+        
+        result = await session.execute(
+            select(Order).where(
+                and_(
+                    Order.user_id == user_id,
+                    Order.status.in_([OrderStatus.COMPLETED, OrderStatus.DELIVERED])
+                )
+            ).limit(1)
+        )
+        has_orders = result.scalar_one_or_none()
+        
+        if has_orders:
+            return ApplyPromoResponse(
+                success=False,
+                message="This promo code is only for new users"
+            )
+    
+    # Calculate cart total
+    cart_total = Decimal("0.00")
+    applicable_items = []
+    
+    for item in cart_items:
+        product = item.product
+        
+        # Check if promo is restricted to specific game or product
+        if promo_code.game_id and product.game_id != promo_code.game_id:
+            continue
+        
+        if promo_code.product_id and product.id != promo_code.product_id:
+            continue
+        
+        # Get current price
+        price_result = await session.execute(
+            select(Price).where(
+                Price.product_id == product.id,
+                Price.is_active == True
+            ).limit(1)
+        )
+        price = price_result.scalar_one_or_none()
+        
+        if price:
+            item_total = price.base_price * item.quantity
+            cart_total += item_total
+            applicable_items.append((item, price, item_total))
+    
+    if not applicable_items:
+        return ApplyPromoResponse(
+            success=False,
+            message="Promo code is not applicable to items in your cart"
+        )
+    
+    # Calculate discount based on promo type
+    discount_amount = Decimal("0.00")
+    
+    if promo_code.promo_type == PromoType.PERCENT:
+        # Percentage discount
+        discount_amount = (cart_total * promo_code.value) / Decimal("100")
+    elif promo_code.promo_type == PromoType.FIXED:
+        # Fixed amount discount
+        discount_amount = promo_code.value
+    
+    # Ensure discount doesn't exceed cart total (price never negative)
+    if discount_amount > cart_total:
+        discount_amount = cart_total
+    
+    discounted_total = cart_total - discount_amount
+    
+    # Ensure discounted total is never negative
+    if discounted_total < Decimal("0.00"):
+        discounted_total = Decimal("0.00")
+    
+    return ApplyPromoResponse(
+        success=True,
+        message="Promo code applied successfully",
+        discount_amount=discount_amount,
+        promo_type=promo_code.promo_type.value,
+        original_total=cart_total,
+        discounted_total=discounted_total
     )

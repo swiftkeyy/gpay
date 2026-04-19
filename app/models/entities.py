@@ -36,6 +36,7 @@ from app.models.enums import (
     FulfillmentType,
     LotDeliveryType,
     LotStatus,
+    LotStockStatus,
     MediaType,
     NotificationType,
     OrderStatus,
@@ -305,6 +306,7 @@ class Order(Base, TimestampMixin):
     __table_args__ = (
         UniqueConstraint("order_number", name="uq_orders_order_number"),
         Index("ix_orders_user_status_created", "user_id", "status", "created_at"),
+        Index("ix_orders_idempotency_key", "idempotency_key", unique=True),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -336,10 +338,12 @@ class Order(Base, TimestampMixin):
     )
     customer_data_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default=sa_text("'{}'::jsonb"))
     admin_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    idempotency_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     user: Mapped["User"] = relationship()
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
     status_history: Mapped[list["OrderStatusHistory"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    payments: Mapped[list["Payment"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
@@ -543,6 +547,7 @@ class Lot(Base, TimestampMixin, SoftDeleteMixin):
     __table_args__ = (
         Index("ix_lots_product_seller_status", "product_id", "seller_id", "status"),
         Index("ix_lots_status_price", "status", "price"),
+        Index("ix_lots_boosted_until", "boosted_until"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
@@ -570,10 +575,12 @@ class Lot(Base, TimestampMixin, SoftDeleteMixin):
     auto_delivery_data: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default=sa_text("'{}'::jsonb"))
     delivery_time_minutes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     is_featured: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
+    boosted_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     seller: Mapped["Seller"] = relationship(back_populates="lots")
     product: Mapped["Product"] = relationship()
     stock_items: Mapped[list["LotStockItem"]] = relationship(back_populates="lot", cascade="all, delete-orphan")
+    images: Mapped[list["LotImage"]] = relationship(back_populates="lot", cascade="all, delete-orphan")
 
 
 class LotStockItem(Base, TimestampMixin):
@@ -592,6 +599,22 @@ class LotStockItem(Base, TimestampMixin):
     deal_id: Mapped[int | None] = mapped_column(ForeignKey("deals.id", ondelete="SET NULL"), nullable=True)
 
     lot: Mapped["Lot"] = relationship(back_populates="stock_items")
+
+
+class LotImage(Base):
+    __tablename__ = "lot_images"
+    __table_args__ = (
+        Index("ix_lot_images_lot_sort", "lot_id", "sort_order"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lot_id: Mapped[int] = mapped_column(ForeignKey("lots.id", ondelete="CASCADE"), nullable=False)
+    media_id: Mapped[int] = mapped_column(ForeignKey("media_files.id", ondelete="CASCADE"), nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=sa_text("0"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    lot: Mapped["Lot"] = relationship(back_populates="images")
+    media: Mapped["MediaFile"] = relationship()
 
 
 class Deal(Base, TimestampMixin):
@@ -791,3 +814,31 @@ class Notification(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     user: Mapped["User"] = relationship()
+
+
+class Payment(TimestampMixin, Base):
+    """Payment records for order payments."""
+    __tablename__ = "payments"
+    __table_args__ = (
+        Index("ix_payments_order_id", "order_id"),
+        Index("ix_payments_external_payment_id", "external_payment_id"),
+        Index("ix_payments_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
+    payment_provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    external_payment_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False, default="RUB")
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    payment_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # Relationships
+    order: Mapped["Order"] = relationship(back_populates="payments")
+
+
+# Update Order model to add payments relationship (if not already present)
+# This should be added to the Order class definition

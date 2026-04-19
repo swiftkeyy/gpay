@@ -16,6 +16,7 @@ from app.models.entities import (
     User, Admin, Seller, Lot, Deal, DealDispute, SellerWithdrawal, Order
 )
 from app.models.enums import DealStatus
+from api.schemas.admin import SellerApprovalRequest
 
 router = APIRouter()
 
@@ -279,44 +280,207 @@ async def approve_seller(
     user_id: int = 1,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Approve seller application."""
+    """Approve seller application.
+    
+    Requirements: 3.2, 3.3
+    - Updates seller status to active
+    - Sets is_verified flag to true
+    - Sets verified_at timestamp
+    - Sends notification to user
+    """
     await require_admin(user_id, session)
     
     result = await session.execute(
-        select(Seller).where(Seller.id == seller_id)
+        select(Seller).options(selectinload(Seller.user)).where(Seller.id == seller_id)
     )
     seller = result.scalar_one_or_none()
     
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
+    if seller.status == "active":
+        raise HTTPException(status_code=400, detail="Seller already approved")
+    
+    # Update seller status and verification
     seller.status = "active"
+    seller.is_verified = True
+    seller.verified_at = datetime.utcnow()
+    
+    # Create notification for user
+    from app.models.entities import Notification
+    from app.models.enums import NotificationType
+    
+    notification = Notification(
+        user_id=seller.user_id,
+        notification_type=NotificationType.SELLER_APPROVED,
+        title="Seller Application Approved",
+        message=f"Congratulations! Your seller application for '{seller.shop_name}' has been approved. You can now start creating listings.",
+        reference_type="seller",
+        reference_id=seller.id
+    )
+    session.add(notification)
+    
     await session.commit()
     
-    return {"message": "Seller approved"}
+    return {
+        "message": "Seller approved",
+        "seller_id": seller.id,
+        "status": "active",
+        "is_verified": True
+    }
 
 
 @router.post("/sellers/{seller_id}/reject")
 async def reject_seller(
     seller_id: int,
+    rejection_reason: str | None = None,
     user_id: int = 1,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Reject seller application."""
+    """Reject seller application.
+    
+    Requirements: 3.2, 3.4
+    - Updates seller status to rejected
+    - Sends notification to user with rejection reason
+    """
     await require_admin(user_id, session)
     
     result = await session.execute(
-        select(Seller).where(Seller.id == seller_id)
+        select(Seller).options(selectinload(Seller.user)).where(Seller.id == seller_id)
     )
     seller = result.scalar_one_or_none()
     
     if not seller:
         raise HTTPException(status_code=404, detail="Seller not found")
     
+    if seller.status == "rejected":
+        raise HTTPException(status_code=400, detail="Seller already rejected")
+    
+    # Update seller status
     seller.status = "rejected"
+    
+    # Create notification for user
+    from app.models.entities import Notification
+    from app.models.enums import NotificationType
+    
+    message = f"Your seller application for '{seller.shop_name}' has been rejected."
+    if rejection_reason:
+        message += f"\n\nReason: {rejection_reason}"
+    
+    notification = Notification(
+        user_id=seller.user_id,
+        notification_type=NotificationType.SELLER_REJECTED,
+        title="Seller Application Rejected",
+        message=message,
+        reference_type="seller",
+        reference_id=seller.id
+    )
+    session.add(notification)
+    
     await session.commit()
     
-    return {"message": "Seller rejected"}
+    return {
+        "message": "Seller rejected",
+        "seller_id": seller.id,
+        "status": "rejected"
+    }
+
+
+@router.patch("/sellers/{seller_id}")
+async def update_seller_status(
+    seller_id: int,
+    request: SellerApprovalRequest,
+    user_id: int = 1,
+    session: AsyncSession = Depends(get_db_session)
+):
+    """Update seller status (approve/reject/suspend).
+    
+    Requirements: 3.2, 3.3, 3.4, 3.5
+    - Updates seller status and verified flag
+    - Sends notification to user
+    - Supports approval, rejection, and suspension
+    """
+    await require_admin(user_id, session)
+    
+    result = await session.execute(
+        select(Seller).options(selectinload(Seller.user)).where(Seller.id == seller_id)
+    )
+    seller = result.scalar_one_or_none()
+    
+    if not seller:
+        raise HTTPException(status_code=404, detail="Seller not found")
+    
+    old_status = seller.status
+    new_status = request.status
+    
+    # Update seller status
+    seller.status = new_status
+    
+    # Handle approval
+    if new_status == "active" and old_status != "active":
+        seller.is_verified = True
+        seller.verified_at = datetime.utcnow()
+        
+        # Create notification
+        from app.models.entities import Notification
+        from app.models.enums import NotificationType
+        
+        notification = Notification(
+            user_id=seller.user_id,
+            notification_type=NotificationType.SELLER_APPROVED,
+            title="Seller Application Approved",
+            message=f"Congratulations! Your seller application for '{seller.shop_name}' has been approved. You can now start creating listings.",
+            reference_type="seller",
+            reference_id=seller.id
+        )
+        session.add(notification)
+    
+    # Handle rejection
+    elif new_status == "rejected":
+        from app.models.entities import Notification
+        from app.models.enums import NotificationType
+        
+        message = f"Your seller application for '{seller.shop_name}' has been rejected."
+        if request.rejection_reason:
+            message += f"\n\nReason: {request.rejection_reason}"
+        
+        notification = Notification(
+            user_id=seller.user_id,
+            notification_type=NotificationType.SELLER_REJECTED,
+            title="Seller Application Rejected",
+            message=message,
+            reference_type="seller",
+            reference_id=seller.id
+        )
+        session.add(notification)
+    
+    # Handle suspension
+    elif new_status == "suspended":
+        from app.models.entities import Notification
+        from app.models.enums import NotificationType
+        
+        message = f"Your seller account '{seller.shop_name}' has been suspended."
+        if request.rejection_reason:
+            message += f"\n\nReason: {request.rejection_reason}"
+        
+        notification = Notification(
+            user_id=seller.user_id,
+            notification_type=NotificationType.SYSTEM,
+            title="Seller Account Suspended",
+            message=message,
+            reference_type="seller",
+            reference_id=seller.id
+        )
+        session.add(notification)
+    
+    await session.commit()
+    
+    return {
+        "message": f"Seller status updated to {new_status}",
+        "seller_id": seller.id,
+        "status": seller.status,
+        "is_verified": seller.is_verified
+    }
 
 
 # Lots management

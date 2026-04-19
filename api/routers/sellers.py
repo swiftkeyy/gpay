@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, func, or_
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.models.entities import User, Seller, Lot, Deal, Transaction
+from app.models.entities import User, Seller, Lot, Deal, Transaction, DealMessage, DealDispute, SellerWithdrawal, LotStockItem
 from api.dependencies.auth import get_current_user
 
 router = APIRouter()
@@ -300,6 +300,83 @@ async def get_seller_dashboard(
     )
     in_escrow = result.scalar()
     
+    # Calculate response time (average time between buyer message and seller first reply)
+    # Get all deals for this seller
+    result = await db.execute(
+        select(Deal.id, Deal.buyer_id).where(
+            Deal.seller_id == seller.id
+        )
+    )
+    deals_data = result.all()
+    
+    response_times = []
+    for deal_id, buyer_id in deals_data:
+        # Get first buyer message
+        result = await db.execute(
+            select(DealMessage.created_at).where(
+                and_(
+                    DealMessage.deal_id == deal_id,
+                    DealMessage.sender_id == buyer_id,
+                    DealMessage.is_system == False
+                )
+            ).order_by(DealMessage.created_at.asc()).limit(1)
+        )
+        first_buyer_msg = result.scalar_one_or_none()
+        
+        if first_buyer_msg:
+            # Get first seller reply after buyer message
+            result = await db.execute(
+                select(DealMessage.created_at).where(
+                    and_(
+                        DealMessage.deal_id == deal_id,
+                        DealMessage.sender_id == current_user.id,
+                        DealMessage.created_at > first_buyer_msg,
+                        DealMessage.is_system == False
+                    )
+                ).order_by(DealMessage.created_at.asc()).limit(1)
+            )
+            first_seller_reply = result.scalar_one_or_none()
+            
+            if first_seller_reply:
+                response_time_seconds = (first_seller_reply - first_buyer_msg).total_seconds()
+                response_times.append(response_time_seconds)
+    
+    # Calculate average response time in minutes
+    avg_response_time = None
+    if response_times:
+        avg_response_time = round(sum(response_times) / len(response_times) / 60, 1)  # Convert to minutes
+    
+    # Calculate completion rate (percentage of deals completed without disputes)
+    result = await db.execute(
+        select(func.count(Deal.id)).where(
+            and_(
+                Deal.seller_id == seller.id,
+                Deal.status == 'completed'
+            )
+        )
+    )
+    total_completed_deals = result.scalar()
+    
+    result = await db.execute(
+        select(func.count(DealDispute.id)).where(
+            and_(
+                DealDispute.deal_id.in_(
+                    select(Deal.id).where(
+                        and_(
+                            Deal.seller_id == seller.id,
+                            Deal.status == 'completed'
+                        )
+                    )
+                )
+            )
+        )
+    )
+    deals_with_disputes = result.scalar()
+    
+    completion_rate = None
+    if total_completed_deals > 0:
+        completion_rate = round(((total_completed_deals - deals_with_disputes) / total_completed_deals) * 100, 1)
+    
     return {
         "balance": {
             "available": float(seller.balance),
@@ -324,8 +401,11 @@ async def get_seller_dashboard(
         },
         "performance": {
             "rating": float(seller.rating),
+            "total_reviews": seller.total_reviews,
             "total_sales": seller.total_sales,
-            "active_deals": active_deals
+            "active_deals": active_deals,
+            "response_time": avg_response_time,  # Average response time in minutes
+            "completion_rate": completion_rate  # Percentage of deals completed without disputes
         }
     }
 
@@ -528,6 +608,7 @@ async def add_stock_items(
     db: AsyncSession = Depends(get_db)
 ):
     """Add stock items for auto-delivery."""
+    # Validate seller
     result = await db.execute(
         select(Seller).where(Seller.user_id == current_user.id)
     )
@@ -539,8 +620,11 @@ async def add_stock_items(
             detail="Not a seller"
         )
     
+    # Get lot with stock items relationship
     result = await db.execute(
-        select(Lot).where(and_(Lot.id == lot_id, Lot.seller_id == seller.id))
+        select(Lot)
+        .options(selectinload(Lot.stock_items))
+        .where(and_(Lot.id == lot_id, Lot.seller_id == seller.id))
     )
     lot = result.scalar_one_or_none()
     
@@ -550,30 +634,75 @@ async def add_stock_items(
             detail="Lot not found"
         )
     
+    # Validate delivery type is auto
     if lot.delivery_type != "auto":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Stock items only for auto-delivery lots"
+            detail="Stock items can only be added to auto-delivery lots"
         )
     
-    # Add stock items
+    # Validate items list is not empty
+    if not items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Items list cannot be empty"
+        )
+    
+    # Create stock items
+    created_items = []
     for item in items:
         stock_item = LotStockItem(
             lot_id=lot_id,
             data=item.data,
-            is_sold=False
+            is_sold=False,
+            is_reserved=False
         )
         db.add(stock_item)
+        created_items.append(stock_item)
     
-    # Update lot status
-    if lot.status == "out_of_stock":
+    # Flush to get IDs for created items
+    await db.flush()
+    
+    # Count available stock (not sold, not reserved)
+    result = await db.execute(
+        select(func.count(LotStockItem.id)).where(
+            and_(
+                LotStockItem.lot_id == lot_id,
+                LotStockItem.is_sold == False,
+                LotStockItem.is_reserved == False
+            )
+        )
+    )
+    available_stock = result.scalar()
+    
+    # Update lot stock_count
+    lot.stock_count = available_stock
+    
+    # Update lot status based on stock availability
+    if lot.status == "out_of_stock" and available_stock > 0:
         lot.status = "active"
     
     await db.commit()
     
+    # Refresh created items to get all fields
+    for item in created_items:
+        await db.refresh(item)
+    
+    logger.info(f"Added {len(items)} stock items to lot {lot_id}, new stock count: {available_stock}")
+    
     return {
-        "message": f"{len(items)} stock items added",
-        "lot_status": lot.status
+        "lot_id": lot_id,
+        "items_added": len(items),
+        "total_stock": available_stock,
+        "items": [
+            {
+                "id": item.id,
+                "data": item.data,
+                "status": "available",
+                "created_at": item.created_at.isoformat()
+            }
+            for item in created_items
+        ]
     }
 
 
@@ -585,7 +714,18 @@ async def boost_lot(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Boost lot to top of search results."""
+    """
+    Boost lot to prioritize in search results.
+    
+    Requirements: 22.1, 22.2, 22.3, 22.4
+    
+    Pricing tiers:
+    - 24 hours: 100 RUB
+    - 48 hours: 180 RUB (10% discount)
+    - 72 hours: 250 RUB (15% discount)
+    - 168 hours (1 week): 500 RUB (30% discount)
+    """
+    # Get seller
     result = await db.execute(
         select(Seller).where(Seller.user_id == current_user.id)
     )
@@ -597,6 +737,7 @@ async def boost_lot(
             detail="Not a seller"
         )
     
+    # Get lot
     result = await db.execute(
         select(Lot).where(and_(Lot.id == lot_id, Lot.seller_id == seller.id))
     )
@@ -608,37 +749,89 @@ async def boost_lot(
             detail="Lot not found"
         )
     
-    # Calculate boost cost (e.g., 10 RUB per hour)
-    boost_cost = Decimal(str(request.duration_hours * 10))
+    # Validate duration is in allowed values (22.1)
+    allowed_durations = {24, 48, 72, 168}
+    if request.duration_hours not in allowed_durations:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid duration. Allowed values: {', '.join(map(str, sorted(allowed_durations)))} hours"
+        )
     
+    # Calculate boost cost based on duration with tiered pricing
+    boost_pricing = {
+        24: Decimal("100.00"),   # 100 RUB per day
+        48: Decimal("180.00"),   # 10% discount
+        72: Decimal("250.00"),   # 15% discount
+        168: Decimal("500.00"),  # 30% discount (1 week)
+    }
+    boost_cost = boost_pricing[request.duration_hours]
+    
+    # Validate seller has sufficient balance (22.2)
     if seller.balance < boost_cost:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Insufficient balance"
+            detail=f"Insufficient balance. Required: {float(boost_cost)} RUB, Available: {float(seller.balance)} RUB"
         )
     
-    # Deduct cost
+    # Check if lot is already boosted (optional: allow extending boost)
+    now = datetime.utcnow()
+    if lot.boosted_until and lot.boosted_until > now:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Lot is already boosted until {lot.boosted_until.isoformat()}. Wait for current boost to expire."
+        )
+    
+    # Deduct boost cost from seller balance (22.2)
+    balance_before = seller.balance
     seller.balance -= boost_cost
+    balance_after = seller.balance
     
-    # Set boost expiration
-    lot.boosted_until = datetime.utcnow() + timedelta(hours=request.duration_hours)
+    # Set boost expiration (22.3)
+    boosted_until = now + timedelta(hours=request.duration_hours)
+    lot.boosted_until = boosted_until
     
-    # Create transaction
+    # Create transaction record for the boost purchase (22.2)
+    from app.models.enums import TransactionType, TransactionStatus
+    
     transaction = Transaction(
         user_id=current_user.id,
-        type="boost",
+        transaction_type=TransactionType.BOOST,
         amount=-boost_cost,
-        description=f"Boost lot #{lot_id} for {request.duration_hours} hours"
+        currency_code="RUB",
+        status=TransactionStatus.COMPLETED,
+        balance_before=balance_before,
+        balance_after=balance_after,
+        description=f"Boost lot #{lot_id} '{lot.title}' for {request.duration_hours} hours",
+        reference_type="lot",
+        reference_id=lot_id,
+        metadata_json={
+            "lot_id": lot_id,
+            "lot_title": lot.title,
+            "duration_hours": request.duration_hours,
+            "boost_cost": float(boost_cost),
+            "boosted_until": boosted_until.isoformat()
+        }
     )
     db.add(transaction)
     
     await db.commit()
+    await db.refresh(lot)
+    await db.refresh(seller)
+    await db.refresh(transaction)
+    
+    logger.info(
+        f"Lot boosted: lot_id={lot_id}, seller_id={seller.id}, "
+        f"duration={request.duration_hours}h, cost={boost_cost}, "
+        f"boosted_until={boosted_until.isoformat()}"
+    )
     
     return {
-        "message": "Lot boosted successfully",
-        "boosted_until": lot.boosted_until.isoformat(),
-        "cost": float(boost_cost),
-        "new_balance": float(seller.balance)
+        "lot_id": lot_id,
+        "boost_cost": float(boost_cost),
+        "duration_hours": request.duration_hours,
+        "boosted_until": boosted_until.isoformat(),
+        "remaining_balance": float(seller.balance),
+        "transaction_id": transaction.id
     }
 
 

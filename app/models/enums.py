@@ -142,6 +142,7 @@ class TransactionType(StrEnum):
     COMMISSION = "commission"
     BONUS = "bonus"
     PENALTY = "penalty"
+    BOOST = "boost"
 
 
 class TransactionStatus(StrEnum):
@@ -174,6 +175,8 @@ class NotificationType(StrEnum):
     REVIEW = "review"
     SYSTEM = "system"
     PRICE_ALERT = "price_alert"
+    SELLER_APPROVED = "seller_approved"
+    SELLER_REJECTED = "seller_rejected"
 
 
 class LotStockStatus(StrEnum):
@@ -181,3 +184,18 @@ class LotStockStatus(StrEnum):
     RESERVED = "reserved"
     SOLD = "sold"
     EXPIRED = "expired"
+
+
+class PaymentStatus(StrEnum):
+    PENDING = "pending"
+    SUCCESS = "success"
+    FAILED = "failed"
+    CANCELED = "canceled"
+
+
+class PaymentProvider(StrEnum):
+    YOOKASSA = "yookassa"
+    TINKOFF = "tinkoff"
+    CLOUDPAYMENTS = "cloudpayments"
+    CRYPTOBOT = "cryptobot"
+    TELEGRAM_STARS = "telegram_stars"
