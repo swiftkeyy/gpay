@@ -13,7 +13,7 @@ from sqlalchemy import select, and_, func, or_, desc
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.models.entities import User, Seller, Lot, Deal, Dispute, Transaction, Withdrawal, Review as ProductReview, Review as SellerReview, AuditLog, Broadcast
+from app.models.entities import User, Seller, Lot, Deal, DealDispute, Transaction, SellerWithdrawal, Review, AuditLog, Broadcast
 from api.dependencies.auth import get_current_admin
 
 router = APIRouter()
