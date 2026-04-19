@@ -215,18 +215,24 @@ async def search_lots(
         
         if price:
             logger.info(f"Found price for product {product.id}: {price.base_price} {price.currency_code}")
+            # Generate temporary image URLs using picsum.photos
+            image_urls = [
+                f"https://picsum.photos/seed/{product.id}-1/400/400",
+                f"https://picsum.photos/seed/{product.id}-2/400/400",
+                f"https://picsum.photos/seed/{product.id}-3/400/400",
+            ]
             items.append({
                 "id": product.id,
                 "title": product.title or "Без названия",
                 "description": product.description or "",
                 "price": float(price.base_price) if price.base_price else 0.0,
                 "currency_code": price.currency_code or "RUB",
-                "images": [],  # TODO: Get from media_files
-                "seller_name": "Game Pay",  # Temporary
-                "seller_rating": 5.0,  # Temporary
-                "rating": 5.0,  # Temporary
+                "images": image_urls,
+                "seller_name": "Game Pay",
+                "seller_rating": 5.0,
+                "rating": 5.0,
                 "delivery_type": "manual",
-                "stock_count": 999,  # Temporary - always in stock
+                "stock_count": 999,
                 "is_featured": product.is_featured or False,
             })
         else:
