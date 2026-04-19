@@ -116,7 +116,7 @@ async def get_categories(
             id=cat.id,
             title=cat.title,
             game_id=cat.game_id,
-            parent_id=cat.parent_id
+            parent_id=None  # Categories don't have parent_id, they belong to games
         )
         for cat in categories
     ]
