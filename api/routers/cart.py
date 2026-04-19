@@ -17,6 +17,20 @@ from app.models.enums import LotStatus, LotStockStatus
 
 router = APIRouter()
 
+# Real game images mapping (same as catalog.py)
+GAME_IMAGES = {
+    "brawl-stars": "https://i.imgur.com/8QZqZ5L.png",
+    "roblox": "https://i.imgur.com/xVpIvMZ.png",
+    "genshin-impact": "https://i.imgur.com/yH8UqLJ.png",
+    "cs2": "https://i.imgur.com/9fRaldg.png",
+    "minecraft": "https://i.imgur.com/5MzQwYc.png",
+    "standoff-2": "https://i.imgur.com/kF3jYvN.png",
+    "fortnite": "https://i.imgur.com/TQcGHrA.png",
+    "valorant": "https://i.imgur.com/X3FqJqZ.png",
+    "pubg": "https://i.imgur.com/nRGzYvL.png",
+    "mobile-legends": "https://i.imgur.com/8pLqZ5M.png",
+}
+
 
 # Request/Response Models
 class AddToCartRequest(BaseModel):
@@ -106,11 +120,18 @@ async def get_cart(
         if not price:
             continue
         
+        # Get game info for image
+        game_result = await session.execute(
+            select(Game).where(Game.id == product.game_id)
+        )
+        game = game_result.scalar_one_or_none()
+        
         item_subtotal = price.base_price * item.quantity
         subtotal += item_subtotal
         
-        # Generate temporary image URL
-        image_url = f"https://picsum.photos/seed/{product.id}/400/400"
+        # Use game-specific images (Playerok-style)
+        game_slug = game.slug if game else "default"
+        image_url = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
         
         items_response.append(CartItemResponse(
             id=item.id,
@@ -121,7 +142,7 @@ async def get_cart(
             quantity=item.quantity,
             subtotal=item_subtotal,
             seller_name="Game Pay",
-            delivery_type="manual",
+            delivery_type="auto" if product.fulfillment_type.value == "auto" else "manual",
             stock_available=999
         ))
     

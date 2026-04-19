@@ -15,7 +15,7 @@ from sqlalchemy.orm import selectinload
 from app.db.session import get_db_session
 from app.models.entities import (
     Cart, CartItem, Order, OrderItem, Deal, Lot, LotStockItem,
-    User, Seller, Transaction, OrderStatusHistory
+    User, Seller, Transaction, OrderStatusHistory, Product, Game
 )
 from app.models.enums import (
     OrderStatus, DealStatus, LotDeliveryType, LotStockStatus,
@@ -23,6 +23,20 @@ from app.models.enums import (
 )
 
 router = APIRouter()
+
+# Real game images mapping (same as catalog.py)
+GAME_IMAGES = {
+    "brawl-stars": "https://i.imgur.com/8QZqZ5L.png",
+    "roblox": "https://i.imgur.com/xVpIvMZ.png",
+    "genshin-impact": "https://i.imgur.com/yH8UqLJ.png",
+    "cs2": "https://i.imgur.com/9fRaldg.png",
+    "minecraft": "https://i.imgur.com/5MzQwYc.png",
+    "standoff-2": "https://i.imgur.com/kF3jYvN.png",
+    "fortnite": "https://i.imgur.com/TQcGHrA.png",
+    "valorant": "https://i.imgur.com/X3FqJqZ.png",
+    "pubg": "https://i.imgur.com/nRGzYvL.png",
+    "mobile-legends": "https://i.imgur.com/8pLqZ5M.png",
+}
 
 
 # Request/Response Models
@@ -387,8 +401,21 @@ async def _get_order_response(
         lot = item.lot
         seller_user = item.seller.user if item.seller else None
         
-        # Generate temporary image URL
-        image_url = f"https://picsum.photos/seed/lot-{lot.id}/400/400"
+        # Get product and game for image
+        product_result = await session.execute(
+            select(Product).where(Product.id == lot.product_id)
+        )
+        product = product_result.scalar_one_or_none()
+        
+        if product:
+            game_result = await session.execute(
+                select(Game).where(Game.id == product.game_id)
+            )
+            game = game_result.scalar_one_or_none()
+            game_slug = game.slug if game else "default"
+            image_url = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
+        else:
+            image_url = f"https://picsum.photos/seed/lot-{lot.id}/400/400"
         
         items_response.append(OrderItemResponse(
             id=item.id,
