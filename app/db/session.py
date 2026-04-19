@@ -29,3 +29,7 @@ SessionLocal = session_factory
 async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     async with session_factory() as session:
         yield session
+
+
+# Alias for FastAPI dependency
+get_db = get_db_session
