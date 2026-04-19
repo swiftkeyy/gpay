@@ -11,6 +11,20 @@ from app.models import Game, Category, Product, Lot
 
 router = APIRouter()
 
+# Real game images mapping (Playerok-style)
+GAME_IMAGES = {
+    "brawl-stars": "https://i.imgur.com/8QZqZ5L.png",
+    "roblox": "https://i.imgur.com/xVpIvMZ.png",
+    "genshin-impact": "https://i.imgur.com/yH8UqLJ.png",
+    "cs2": "https://i.imgur.com/9fRaldg.png",
+    "minecraft": "https://i.imgur.com/5MzQwYc.png",
+    "standoff-2": "https://i.imgur.com/kF3jYvN.png",
+    "fortnite": "https://i.imgur.com/TQcGHrA.png",
+    "valorant": "https://i.imgur.com/X3FqJqZ.png",
+    "pubg": "https://i.imgur.com/nRGzYvL.png",
+    "mobile-legends": "https://i.imgur.com/8pLqZ5M.png",
+}
+
 
 class GameResponse(BaseModel):
     id: int
@@ -53,7 +67,7 @@ async def get_games(
     search: str | None = None,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get list of games with pagination."""
+    """Get list of games with pagination and images."""
     query = select(Game).where(Game.is_active == True)
     
     if search:
@@ -70,6 +84,7 @@ async def get_games(
                 "name": game.title,
                 "slug": game.slug,
                 "description": game.description,
+                "image_url": GAME_IMAGES.get(game.slug, f"https://picsum.photos/seed/{game.slug}/200/200"),
                 "is_active": game.is_active
             }
             for game in games
@@ -165,10 +180,7 @@ async def search_lots(
     limit: int = Query(20, ge=1, le=50),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Search lots with filters and sorting.
-    
-    TEMPORARY: Returns products as lots until we have real sellers and lots.
-    """
+    """Search lots with filters and sorting (Playerok-style)."""
     import logging
     from app.models import Price
     
@@ -213,14 +225,26 @@ async def search_lots(
         )
         price = price_result.scalar_one_or_none()
         
+        # Get game info for image
+        game_result = await session.execute(
+            select(Game).where(Game.id == product.game_id)
+        )
+        game = game_result.scalar_one_or_none()
+        
         if price:
             logger.info(f"Found price for product {product.id}: {price.base_price} {price.currency_code}")
-            # Generate temporary image URLs using picsum.photos
+            
+            # Use game-specific images (Playerok-style)
+            game_slug = game.slug if game else "default"
+            game_image = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
+            
+            # Generate product-specific images based on game
             image_urls = [
-                f"https://picsum.photos/seed/{product.id}-1/400/400",
+                game_image,
                 f"https://picsum.photos/seed/{product.id}-2/400/400",
                 f"https://picsum.photos/seed/{product.id}-3/400/400",
             ]
+            
             items.append({
                 "id": product.id,
                 "title": product.title or "Без названия",
@@ -228,10 +252,13 @@ async def search_lots(
                 "price": float(price.base_price) if price.base_price else 0.0,
                 "currency_code": price.currency_code or "RUB",
                 "images": image_urls,
+                "game_slug": game_slug,
+                "game_name": game.title if game else "Unknown",
+                "game_image_url": game_image,
                 "seller_name": "Game Pay",
                 "seller_rating": 5.0,
                 "rating": 5.0,
-                "delivery_type": "manual",
+                "delivery_type": "auto" if product.fulfillment_type.value == "auto" else "manual",
                 "stock_count": 999,
                 "is_featured": product.is_featured or False,
             })
@@ -253,7 +280,7 @@ async def get_lot(
     lot_id: int,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get lot details (using Product as lot)."""
+    """Get lot details (Playerok-style with game info)."""
     import logging
     logger = logging.getLogger(__name__)
     
@@ -280,9 +307,25 @@ async def get_lot(
         from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="Price not found for this product")
     
-    # Generate temporary image URLs
+    # Get game info
+    game_result = await session.execute(
+        select(Game).where(Game.id == product.game_id)
+    )
+    game = game_result.scalar_one_or_none()
+    
+    # Get category info
+    category_result = await session.execute(
+        select(Category).where(Category.id == product.category_id)
+    )
+    category = category_result.scalar_one_or_none()
+    
+    # Use game-specific images (Playerok-style)
+    game_slug = game.slug if game else "default"
+    game_image = GAME_IMAGES.get(game_slug, f"https://picsum.photos/seed/{game_slug}/400/400")
+    
+    # Generate product-specific images
     image_urls = [
-        f"https://picsum.photos/seed/{product.id}-1/400/400",
+        game_image,
         f"https://picsum.photos/seed/{product.id}-2/400/400",
         f"https://picsum.photos/seed/{product.id}-3/400/400",
     ]
@@ -294,11 +337,18 @@ async def get_lot(
         "price": float(price.base_price) if price.base_price else 0.0,
         "currency_code": price.currency_code or "RUB",
         "images": image_urls,
+        "game_slug": game_slug,
+        "game_name": game.title if game else "Unknown",
+        "game_image_url": game_image,
+        "category_name": category.title if category else "Unknown",
         "seller_name": "Game Pay",
         "seller_id": 1,
         "seller_rating": 5.0,
+        "seller_total_sales": 1000,
         "rating": 5.0,
-        "delivery_type": "manual",
+        "total_reviews": 150,
+        "delivery_type": "auto" if product.fulfillment_type.value == "auto" else "manual",
+        "delivery_time_minutes": 5 if product.fulfillment_type.value == "auto" else None,
         "stock_count": 999,
         "is_featured": product.is_featured or False,
         "status": "active"

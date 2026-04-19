@@ -168,10 +168,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 bg-gray-50">
       {/* Header */}
-      <div className="sticky top-0 bg-tg-bg border-b border-gray-200 p-4 z-10">
-        <h1 className="text-2xl font-bold mb-3">🎮 {t('app.title')}</h1>
+      <div className="sticky top-0 bg-white border-b border-gray-200 p-4 z-10 shadow-sm">
+        <h1 className="text-2xl font-bold mb-3 text-gray-900">🎮 {t('app.title')}</h1>
         
         {/* Search */}
         <div className="relative mb-3">
@@ -180,30 +180,65 @@ export default function HomePage() {
             placeholder={t('home.search')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full px-4 py-2 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-tg-button"
+            className="w-full px-4 py-3 pr-10 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
           {search && (
             <button
               onClick={() => setSearch('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               ✕
             </button>
           )}
         </div>
 
+        {/* Horizontal Game Categories (Playerok-style) */}
+        {games.length > 0 && (
+          <div className="mb-3 -mx-4 px-4 overflow-x-auto">
+            <div className="flex gap-3 pb-2">
+              <button
+                onClick={() => setSelectedGame('')}
+                className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                  selectedGame === '' 
+                    ? 'bg-purple-600 text-white shadow-lg' 
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                Все игры
+              </button>
+              {games.map(game => (
+                <button
+                  key={game.id}
+                  onClick={() => setSelectedGame(String(game.id))}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-all ${
+                    selectedGame === String(game.id)
+                      ? 'bg-purple-600 text-white shadow-lg'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  }`}
+                >
+                  {game.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Filter and Sort buttons */}
         <div className="flex gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium"
+            className={`flex-1 px-4 py-2 border rounded-lg text-sm font-medium transition-all ${
+              showFilters 
+                ? 'bg-purple-50 border-purple-500 text-purple-700' 
+                : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+            }`}
           >
             🔍 {t('home.filters')}
           </button>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             <option value="popularity">{t('home.sortBy.popularity')}</option>
             <option value="price_asc">{t('home.sortBy.priceAsc')}</option>
@@ -216,30 +251,15 @@ export default function HomePage() {
 
       {/* Filters Panel */}
       {showFilters && (
-        <div className="bg-tg-secondary p-4 border-b border-gray-200">
+        <div className="bg-white p-4 border-b border-gray-200 shadow-sm">
           <div className="space-y-3">
-            {/* Game filter */}
-            <div>
-              <label className="block text-sm font-medium mb-1">{t('lot.game')}</label>
-              <select
-                value={selectedGame}
-                onChange={(e) => setSelectedGame(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">{t('common.all')}</option>
-                {games.map(game => (
-                  <option key={game.id} value={game.id}>{game.name}</option>
-                ))}
-              </select>
-            </div>
-
             {/* Category filter */}
             <div>
-              <label className="block text-sm font-medium mb-1">{t('lot.category')}</label>
+              <label className="block text-sm font-medium mb-1 text-gray-700">{t('lot.category')}</label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">{t('common.all')}</option>
                 {categories.map(cat => (
@@ -250,35 +270,35 @@ export default function HomePage() {
 
             {/* Delivery type filter */}
             <div>
-              <label className="block text-sm font-medium mb-1">{t('product.deliveryType')}</label>
+              <label className="block text-sm font-medium mb-1 text-gray-700">{t('product.deliveryType')}</label>
               <select
                 value={deliveryType}
                 onChange={(e) => setDeliveryType(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">{t('common.all')}</option>
-                <option value="auto">{t('home.deliveryType.auto')}</option>
+                <option value="auto">⚡ {t('home.deliveryType.auto')}</option>
                 <option value="manual">{t('home.deliveryType.manual')}</option>
               </select>
             </div>
 
             {/* Price range */}
             <div>
-              <label className="block text-sm font-medium mb-1">{t('product.price')}</label>
+              <label className="block text-sm font-medium mb-1 text-gray-700">{t('product.price')}</label>
               <div className="flex gap-2">
                 <input
                   type="number"
                   placeholder="Min"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
                 <input
                   type="number"
                   placeholder="Max"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </div>
             </div>
@@ -286,7 +306,7 @@ export default function HomePage() {
             {/* Clear filters */}
             <button
               onClick={clearFilters}
-              className="w-full py-2 text-tg-link text-sm font-medium"
+              className="w-full py-2 text-purple-600 text-sm font-medium hover:text-purple-700"
             >
               {t('common.clear')}
             </button>
@@ -297,16 +317,16 @@ export default function HomePage() {
       {/* Lots Grid */}
       <div className="p-4">
         {loading && lots.length === 0 ? (
-          <div className="text-center py-10">{t('app.loading')}</div>
+          <div className="text-center py-10 text-gray-500">{t('app.loading')}</div>
         ) : lots.length === 0 ? (
           <div className="text-center py-10 text-gray-500">{t('home.noResults')}</div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-4">
               {lots.map((lot) => (
-                <div key={lot.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <div key={lot.id} className="border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow">
                   <Link to={`/product/${lot.id}`}>
-                    <div className="aspect-square bg-gray-100 flex items-center justify-center relative">
+                    <div className="aspect-square bg-gradient-to-br from-purple-50 to-blue-50 flex items-center justify-center relative">
                       {lot.images && Array.isArray(lot.images) && lot.images.length > 0 ? (
                         <img 
                           src={lot.images[0]} 
@@ -318,13 +338,18 @@ export default function HomePage() {
                         <span className="text-4xl">🎮</span>
                       )}
                       {lot.is_featured && (
-                        <div className="absolute top-2 right-2 bg-yellow-400 text-xs px-2 py-1 rounded-full font-bold">
-                          ⭐
+                        <div className="absolute top-2 right-2 bg-gradient-to-r from-yellow-400 to-orange-400 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
+                          ⭐ TOP
+                        </div>
+                      )}
+                      {lot.delivery_type === 'auto' && (
+                        <div className="absolute top-2 left-2 bg-gradient-to-r from-green-400 to-emerald-500 text-white text-xs px-2 py-1 rounded-full font-bold shadow-lg">
+                          ⚡ Авто
                         </div>
                       )}
                       {lot.stock_count === 0 && (
-                        <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                          <span className="text-white font-bold">{t('product.outOfStock')}</span>
+                        <div className="absolute inset-0 bg-black bg-opacity-60 flex items-center justify-center">
+                          <span className="text-white font-bold text-sm">{t('product.outOfStock')}</span>
                         </div>
                       )}
                     </div>
@@ -332,28 +357,30 @@ export default function HomePage() {
                   
                   <div className="p-3">
                     <Link to={`/product/${lot.id}`}>
-                      <h3 className="font-semibold text-sm mb-1 line-clamp-2 min-h-[2.5rem]">
+                      <h3 className="font-semibold text-sm mb-1 line-clamp-2 min-h-[2.5rem] text-gray-900">
                         {lot.title}
                       </h3>
                     </Link>
                     
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-lg font-bold">
-                        {lot.price} {lot.currency_code}
+                      <span className="text-lg font-bold text-purple-600">
+                        {lot.price} ₽
                       </span>
-                      <span className="text-xs text-gray-500">
+                      <span className="text-xs text-yellow-500 font-medium">
                         ⭐ {lot.rating.toFixed(1)}
                       </span>
                     </div>
 
-                    <div className="text-xs text-gray-500 mb-2">
-                      {lot.seller_name} • ⭐ {lot.seller_rating.toFixed(1)}
+                    <div className="text-xs text-gray-500 mb-2 flex items-center gap-1">
+                      <span className="truncate">{lot.seller_name}</span>
+                      <span>•</span>
+                      <span className="text-yellow-500">⭐ {lot.seller_rating.toFixed(1)}</span>
                     </div>
                     
                     <button
                       onClick={(e) => handleAddToCart(lot.id, e)}
                       disabled={lot.stock_count === 0}
-                      className="w-full bg-tg-button text-tg-button-text py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-full bg-gradient-to-r from-purple-600 to-blue-600 text-white py-2 rounded-lg text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:from-purple-700 hover:to-blue-700 transition-all shadow-sm"
                     >
                       {t('product.addToCart')}
                     </button>
