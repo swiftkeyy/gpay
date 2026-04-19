@@ -46,7 +46,7 @@ class LotResponse(BaseModel):
     status: str
 
 
-@router.get("/games", response_model=list[GameResponse])
+@router.get("/games")
 async def get_games(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
@@ -59,20 +59,25 @@ async def get_games(
     if search:
         query = query.where(Game.title.ilike(f"%{search}%"))
     
-    query = query.offset((page - 1) * limit).limit(limit)
+    query = query.order_by(Game.sort_order.asc()).offset((page - 1) * limit).limit(limit)
     result = await session.execute(query)
     games = result.scalars().all()
     
-    return [
-        GameResponse(
-            id=game.id,
-            title=game.title,
-            description=game.description,
-            image_url=None,  # TODO: Get from media_files
-            is_active=game.is_active
-        )
-        for game in games
-    ]
+    return {
+        "items": [
+            {
+                "id": game.id,
+                "name": game.title,
+                "slug": game.slug,
+                "description": game.description,
+                "is_active": game.is_active
+            }
+            for game in games
+        ],
+        "total": len(games),
+        "page": page,
+        "limit": limit,
+    }
 
 
 @router.get("/games/{game_id}")
@@ -97,7 +102,7 @@ async def get_game(
     )
 
 
-@router.get("/categories", response_model=list[CategoryResponse])
+@router.get("/categories")
 async def get_categories(
     game_id: int | None = None,
     session: AsyncSession = Depends(get_db_session)
@@ -108,16 +113,17 @@ async def get_categories(
     if game_id:
         query = query.where(Category.game_id == game_id)
     
+    query = query.order_by(Category.sort_order.asc())
     result = await session.execute(query)
     categories = result.scalars().all()
     
     return [
-        CategoryResponse(
-            id=cat.id,
-            title=cat.title,
-            game_id=cat.game_id,
-            parent_id=None  # Categories don't have parent_id, they belong to games
-        )
+        {
+            "id": cat.id,
+            "name": cat.title,
+            "slug": cat.slug,
+            "game_id": cat.game_id
+        }
         for cat in categories
     ]
 
@@ -147,58 +153,81 @@ async def get_products(
     ]
 
 
-@router.get("/lots", response_model=list[LotResponse])
+@router.get("/lots", response_model=dict)
 async def search_lots(
     game_id: int | None = None,
     category_id: int | None = None,
     min_price: float | None = None,
     max_price: float | None = None,
     delivery_type: str | None = None,
-    sort_by: str = "popularity",
+    sort: str = "popularity",
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=50),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Search lots with filters and sorting."""
-    from app.models.enums import LotStatus
+    """Search lots with filters and sorting.
     
-    query = select(Lot).where(Lot.status == LotStatus.ACTIVE)
+    TEMPORARY: Returns products as lots until we have real sellers and lots.
+    """
+    from app.models import Price
+    from sqlalchemy.orm import selectinload
     
-    if min_price:
-        query = query.where(Lot.price >= min_price)
-    if max_price:
-        query = query.where(Lot.price <= max_price)
-    if delivery_type:
-        query = query.where(Lot.delivery_type == delivery_type)
+    # Query products with their prices
+    query = select(Product).where(Product.is_active == True)
+    
+    if game_id:
+        query = query.where(Product.game_id == game_id)
+    if category_id:
+        query = query.where(Product.category_id == category_id)
     
     # Sorting
-    if sort_by == "price_asc":
-        query = query.order_by(Lot.price.asc())
-    elif sort_by == "price_desc":
-        query = query.order_by(Lot.price.desc())
-    elif sort_by == "newest":
-        query = query.order_by(Lot.created_at.desc())
+    if sort == "price_asc":
+        query = query.order_by(Product.sort_order.asc())
+    elif sort == "price_desc":
+        query = query.order_by(Product.sort_order.desc())
+    elif sort == "newest":
+        query = query.order_by(Product.created_at.desc())
     else:  # popularity
-        query = query.order_by(Lot.sold_count.desc())
+        query = query.order_by(Product.is_featured.desc(), Product.sort_order.asc())
     
     query = query.offset((page - 1) * limit).limit(limit)
     result = await session.execute(query)
-    lots = result.scalars().all()
+    products = result.scalars().all()
     
-    return [
-        LotResponse(
-            id=lot.id,
-            title=lot.title,
-            description=lot.description,
-            price=float(lot.price),
-            currency_code=lot.currency_code,
-            seller_id=lot.seller_id,
-            delivery_type=lot.delivery_type.value,
-            stock_count=lot.stock_count,
-            status=lot.status.value
+    # Get prices for products
+    items = []
+    for product in products:
+        # Get active price
+        price_result = await session.execute(
+            select(Price).where(
+                Price.product_id == product.id,
+                Price.is_active == True
+            ).limit(1)
         )
-        for lot in lots
-    ]
+        price = price_result.scalar_one_or_none()
+        
+        if price:
+            items.append({
+                "id": product.id,
+                "title": product.title,
+                "description": product.description,
+                "price": float(price.base_price),
+                "currency_code": price.currency_code,
+                "images": [],  # TODO: Get from media_files
+                "seller_name": "Game Pay",  # Temporary
+                "seller_rating": 5.0,  # Temporary
+                "rating": 5.0,  # Temporary
+                "delivery_type": "manual",
+                "stock_count": 999,  # Temporary - always in stock
+                "is_featured": product.is_featured,
+            })
+    
+    return {
+        "items": items,
+        "total": len(items),
+        "page": page,
+        "limit": limit,
+    }
 
 
 @router.get("/lots/{lot_id}")
