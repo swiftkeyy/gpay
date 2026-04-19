@@ -18,48 +18,45 @@ depends_on = None
 
 def upgrade():
     # Alter lots table columns to use ENUM types
-    op.execute("""
-        ALTER TABLE lots 
-        ALTER COLUMN status TYPE lot_status_enum USING status::lot_status_enum,
-        ALTER COLUMN delivery_type TYPE lot_delivery_type_enum USING delivery_type::lot_delivery_type_enum;
-    """)
+    # Step 1: Drop defaults
+    op.execute("ALTER TABLE lots ALTER COLUMN status DROP DEFAULT;")
+    op.execute("ALTER TABLE lots ALTER COLUMN delivery_type DROP DEFAULT;")
+    # Step 2: Change type
+    op.execute("ALTER TABLE lots ALTER COLUMN status TYPE lot_status_enum USING status::lot_status_enum;")
+    op.execute("ALTER TABLE lots ALTER COLUMN delivery_type TYPE lot_delivery_type_enum USING delivery_type::lot_delivery_type_enum;")
+    # Step 3: Restore defaults
+    op.execute("ALTER TABLE lots ALTER COLUMN status SET DEFAULT 'draft'::lot_status_enum;")
+    op.execute("ALTER TABLE lots ALTER COLUMN delivery_type SET DEFAULT 'manual'::lot_delivery_type_enum;")
     
     # Alter sellers table
-    op.execute("""
-        ALTER TABLE sellers 
-        ALTER COLUMN status TYPE seller_status_enum USING status::seller_status_enum;
-    """)
+    op.execute("ALTER TABLE sellers ALTER COLUMN status DROP DEFAULT;")
+    op.execute("ALTER TABLE sellers ALTER COLUMN status TYPE seller_status_enum USING status::seller_status_enum;")
+    op.execute("ALTER TABLE sellers ALTER COLUMN status SET DEFAULT 'pending'::seller_status_enum;")
     
     # Alter deals table
-    op.execute("""
-        ALTER TABLE deals 
-        ALTER COLUMN status TYPE deal_status_enum USING status::deal_status_enum;
-    """)
+    op.execute("ALTER TABLE deals ALTER COLUMN status DROP DEFAULT;")
+    op.execute("ALTER TABLE deals ALTER COLUMN status TYPE deal_status_enum USING status::deal_status_enum;")
+    op.execute("ALTER TABLE deals ALTER COLUMN status SET DEFAULT 'created'::deal_status_enum;")
     
     # Alter deal_disputes table
-    op.execute("""
-        ALTER TABLE deal_disputes 
-        ALTER COLUMN status TYPE dispute_status_enum USING status::dispute_status_enum;
-    """)
+    op.execute("ALTER TABLE deal_disputes ALTER COLUMN status DROP DEFAULT;")
+    op.execute("ALTER TABLE deal_disputes ALTER COLUMN status TYPE dispute_status_enum USING status::dispute_status_enum;")
+    op.execute("ALTER TABLE deal_disputes ALTER COLUMN status SET DEFAULT 'open'::dispute_status_enum;")
     
     # Alter transactions table
-    op.execute("""
-        ALTER TABLE transactions 
-        ALTER COLUMN transaction_type TYPE transaction_type_enum USING transaction_type::transaction_type_enum,
-        ALTER COLUMN status TYPE transaction_status_enum USING status::transaction_status_enum;
-    """)
+    op.execute("ALTER TABLE transactions ALTER COLUMN transaction_type DROP DEFAULT;")
+    op.execute("ALTER TABLE transactions ALTER COLUMN status DROP DEFAULT;")
+    op.execute("ALTER TABLE transactions ALTER COLUMN transaction_type TYPE transaction_type_enum USING transaction_type::transaction_type_enum;")
+    op.execute("ALTER TABLE transactions ALTER COLUMN status TYPE transaction_status_enum USING status::transaction_status_enum;")
+    op.execute("ALTER TABLE transactions ALTER COLUMN status SET DEFAULT 'pending'::transaction_status_enum;")
     
     # Alter seller_withdrawals table
-    op.execute("""
-        ALTER TABLE seller_withdrawals 
-        ALTER COLUMN status TYPE withdrawal_status_enum USING status::withdrawal_status_enum;
-    """)
+    op.execute("ALTER TABLE seller_withdrawals ALTER COLUMN status DROP DEFAULT;")
+    op.execute("ALTER TABLE seller_withdrawals ALTER COLUMN status TYPE withdrawal_status_enum USING status::withdrawal_status_enum;")
+    op.execute("ALTER TABLE seller_withdrawals ALTER COLUMN status SET DEFAULT 'pending'::withdrawal_status_enum;")
     
-    # Alter notifications table
-    op.execute("""
-        ALTER TABLE notifications 
-        ALTER COLUMN notification_type TYPE notification_type_enum USING notification_type::notification_type_enum;
-    """)
+    # Alter notifications table (no default to drop)
+    op.execute("ALTER TABLE notifications ALTER COLUMN notification_type TYPE notification_type_enum USING notification_type::notification_type_enum;")
 
 
 def downgrade():
