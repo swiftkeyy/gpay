@@ -51,6 +51,7 @@ class DealResponse(BaseModel):
     seller_id: int
     lot_id: int
     lot_title: str
+    lot_image_url: str
     status: str
     amount: Decimal
     commission_amount: Decimal
@@ -105,6 +106,7 @@ async def get_deal(
         seller_id=deal.seller_id,
         lot_id=deal.lot_id,
         lot_title=deal.lot.title,
+        lot_image_url=f"https://picsum.photos/seed/lot-{deal.lot_id}/400/400",
         status=deal.status.value,
         amount=deal.amount,
         commission_amount=deal.commission_amount,

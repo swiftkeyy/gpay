@@ -35,6 +35,7 @@ class OrderItemResponse(BaseModel):
     id: int
     lot_id: int
     lot_title: str
+    lot_image_url: str
     quantity: int
     price_per_item: Decimal
     subtotal: Decimal
@@ -386,10 +387,14 @@ async def _get_order_response(
         lot = item.lot
         seller_user = item.seller.user if item.seller else None
         
+        # Generate temporary image URL
+        image_url = f"https://picsum.photos/seed/lot-{lot.id}/400/400"
+        
         items_response.append(OrderItemResponse(
             id=item.id,
             lot_id=lot.id,
             lot_title=lot.title,
+            lot_image_url=image_url,
             quantity=item.quantity,
             price_per_item=item.price_per_item,
             subtotal=item.price_per_item * item.quantity,

@@ -359,6 +359,7 @@ async def get_seller_lots(
                 "delivery_type": lot.delivery_type,
                 "views": lot.views,
                 "sales": lot.sales,
+                "image_url": f"https://picsum.photos/seed/lot-{lot.id}/400/400",
                 "created_at": lot.created_at.isoformat()
             }
             for lot in lots
