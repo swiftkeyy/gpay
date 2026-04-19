@@ -33,8 +33,44 @@ async def get_notifications(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Get user notifications."""
-    # TODO: Implement notification retrieval
-    return {"items": [], "total": 0}
+    from sqlalchemy import select, func
+    from app.models import Notification
+    
+    if limit > 100:
+        limit = 100
+    
+    offset = (page - 1) * limit
+    
+    # Get notifications
+    result = await session.execute(
+        select(Notification)
+        .where(Notification.user_id == user_id)
+        .order_by(Notification.created_at.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    notifications = result.scalars().all()
+    
+    # Get total count
+    result = await session.execute(
+        select(func.count(Notification.id)).where(Notification.user_id == user_id)
+    )
+    total = result.scalar() or 0
+    
+    return {
+        "items": [
+            {
+                "id": notif.id,
+                "type": notif.notification_type,
+                "title": notif.title,
+                "message": notif.message,
+                "is_read": notif.is_read,
+                "created_at": notif.created_at.isoformat()
+            }
+            for notif in notifications
+        ],
+        "total": total
+    }
 
 
 @router.patch("/notifications/{notification_id}/read")
@@ -43,7 +79,21 @@ async def mark_as_read(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Mark notification as read."""
-    # TODO: Implement mark as read
+    from sqlalchemy import select
+    from app.models import Notification
+    
+    result = await session.execute(
+        select(Notification).where(Notification.id == notification_id)
+    )
+    notification = result.scalar_one_or_none()
+    
+    if not notification:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Notification not found")
+    
+    notification.is_read = True
+    await session.commit()
+    
     return {"message": "Marked as read"}
 
 
@@ -53,7 +103,16 @@ async def mark_all_as_read(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Mark all notifications as read."""
-    # TODO: Implement mark all as read
+    from sqlalchemy import update
+    from app.models import Notification
+    
+    await session.execute(
+        update(Notification)
+        .where(Notification.user_id == user_id, Notification.is_read == False)
+        .values(is_read=True)
+    )
+    await session.commit()
+    
     return {"message": "All marked as read"}
 
 
@@ -63,8 +122,18 @@ async def get_unread_count(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Get unread notification count."""
-    # TODO: Implement unread count
-    return {"count": 0}
+    from sqlalchemy import select, func
+    from app.models import Notification
+    
+    result = await session.execute(
+        select(func.count(Notification.id)).where(
+            Notification.user_id == user_id,
+            Notification.is_read == False
+        )
+    )
+    count = result.scalar() or 0
+    
+    return {"count": count}
 
 
 @router.websocket("/ws/notifications")
