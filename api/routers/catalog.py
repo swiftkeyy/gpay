@@ -153,7 +153,7 @@ async def get_products(
     ]
 
 
-@router.get("/lots", response_model=dict)
+@router.get("/lots")
 async def search_lots(
     game_id: int | None = None,
     category_id: int | None = None,
@@ -169,8 +169,11 @@ async def search_lots(
     
     TEMPORARY: Returns products as lots until we have real sellers and lots.
     """
+    import logging
     from app.models import Price
-    from sqlalchemy.orm import selectinload
+    
+    logger = logging.getLogger(__name__)
+    logger.info(f"Fetching lots: game_id={game_id}, category_id={category_id}, page={page}, limit={limit}")
     
     # Query products with their prices
     query = select(Product).where(Product.is_active == True)
@@ -194,9 +197,13 @@ async def search_lots(
     result = await session.execute(query)
     products = result.scalars().all()
     
+    logger.info(f"Found {len(products)} products")
+    
     # Get prices for products
     items = []
     for product in products:
+        logger.info(f"Processing product: id={product.id}, title={product.title}")
+        
         # Get active price
         price_result = await session.execute(
             select(Price).where(
@@ -207,20 +214,25 @@ async def search_lots(
         price = price_result.scalar_one_or_none()
         
         if price:
+            logger.info(f"Found price for product {product.id}: {price.base_price} {price.currency_code}")
             items.append({
                 "id": product.id,
-                "title": product.title,
-                "description": product.description,
-                "price": float(price.base_price),
-                "currency_code": price.currency_code,
+                "title": product.title or "Без названия",
+                "description": product.description or "",
+                "price": float(price.base_price) if price.base_price else 0.0,
+                "currency_code": price.currency_code or "RUB",
                 "images": [],  # TODO: Get from media_files
                 "seller_name": "Game Pay",  # Temporary
                 "seller_rating": 5.0,  # Temporary
                 "rating": 5.0,  # Temporary
                 "delivery_type": "manual",
                 "stock_count": 999,  # Temporary - always in stock
-                "is_featured": product.is_featured,
+                "is_featured": product.is_featured or False,
             })
+        else:
+            logger.warning(f"No price found for product {product.id}")
+    
+    logger.info(f"Returning {len(items)} items")
     
     return {
         "items": items,
