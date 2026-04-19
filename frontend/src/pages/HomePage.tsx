@@ -95,18 +95,20 @@ export default function HomePage() {
   const fetchCategories = async () => {
     try {
       const response = await api.get('/categories')
-      setCategories(response.data)
+      setCategories(Array.isArray(response.data) ? response.data : [])
     } catch (error) {
       console.error('Fetch categories error:', error)
+      setCategories([])
     }
   }
 
   const fetchGames = async () => {
     try {
       const response = await api.get('/games', { params: { limit: 50 } })
-      setGames(response.data.items)
+      setGames(Array.isArray(response.data?.items) ? response.data.items : [])
     } catch (error) {
       console.error('Fetch games error:', error)
+      setGames([])
     }
   }
 
@@ -127,7 +129,7 @@ export default function HomePage() {
       if (selectedCategory) params.category_id = selectedCategory
 
       const response = await api.get('/lots', { params })
-      const newLots = response.data.items
+      const newLots = response.data?.items || []
 
       if (reset) {
         setLots(newLots)
@@ -135,7 +137,7 @@ export default function HomePage() {
         setLots(prev => [...prev, ...newLots])
       }
 
-      setHasMore(newLots.length === 20)
+      setHasMore(Array.isArray(newLots) && newLots.length === 20)
     } catch (error) {
       console.error('Fetch lots error:', error)
       showToast(t('errors.generic'), 'error')
