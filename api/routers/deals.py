@@ -331,7 +331,16 @@ async def resolve_dispute(
     session: AsyncSession = Depends(get_db_session)
 ):
     """Admin resolves dispute."""
-    # TODO: Check if user is admin
+    from app.models import Admin
+    
+    # Check if user is admin
+    result = await session.execute(
+        select(Admin).where(Admin.user_id == user_id)
+    )
+    admin = result.scalar_one_or_none()
+    
+    if not admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     
     # Get dispute with deal
     result = await session.execute(
