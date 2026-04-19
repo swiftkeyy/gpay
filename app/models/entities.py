@@ -339,6 +339,7 @@ class Order(Base, TimestampMixin):
 
     user: Mapped["User"] = relationship()
     items: Mapped[list["OrderItem"]] = relationship(back_populates="order", cascade="all, delete-orphan")
+    status_history: Mapped[list["OrderStatusHistory"]] = relationship(back_populates="order", cascade="all, delete-orphan")
 
 
 class OrderItem(Base):
@@ -381,6 +382,8 @@ class OrderStatusHistory(Base):
     comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     payload_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict, server_default=sa_text("'{}'::jsonb"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    order: Mapped["Order"] = relationship(back_populates="status_history")
 
 
 class Review(Base, TimestampMixin):
