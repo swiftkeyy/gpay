@@ -305,7 +305,7 @@ export default function HomePage() {
                 <div key={lot.id} className="border border-gray-200 rounded-lg overflow-hidden bg-white">
                   <Link to={`/product/${lot.id}`}>
                     <div className="aspect-square bg-gray-100 flex items-center justify-center relative">
-                      {lot.images && lot.images.length > 0 ? (
+                      {lot.images && Array.isArray(lot.images) && lot.images.length > 0 ? (
                         <img 
                           src={lot.images[0]} 
                           alt={lot.title} 

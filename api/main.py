@@ -85,7 +85,8 @@ app.include_router(sellers.router, prefix="/api/v1/sellers", tags=["Sellers"])
 app.include_router(reviews.router, prefix="/api/v1", tags=["Reviews"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(payments.router, prefix="/api/v1", tags=["Payments"])
-app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+# Notifications router without prefix for WebSocket to work at /api/v1/ws/notifications
+app.include_router(notifications.router, prefix="/api/v1", tags=["Notifications"])
 
 
 if __name__ == "__main__":

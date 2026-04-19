@@ -75,7 +75,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   },
 
   connectWebSocket: (token: string) => {
-    const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8000/api/v1'
+    const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1'
+    // Convert http/https to ws/wss
+    const WS_URL = API_URL.replace(/^http/, 'ws')
     const ws = new WebSocket(`${WS_URL}/ws/notifications?token=${token}`)
 
     ws.onopen = () => {
