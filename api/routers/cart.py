@@ -100,16 +100,19 @@ async def get_cart(
         item_subtotal = lot.price * item.quantity
         subtotal += item_subtotal
         
+        # Generate temporary image URL
+        image_url = f"https://picsum.photos/seed/lot-{lot.id}/400/400"
+        
         items_response.append(CartItemResponse(
             id=item.id,
             lot_id=lot.id,
             lot_title=lot.title,
             lot_price=lot.price,
-            lot_image_url=None,  # TODO: Get from lot_images
+            lot_image_url=image_url,
             quantity=item.quantity,
             subtotal=item_subtotal,
             seller_id=lot.seller_id,
-            seller_name=seller.username if seller else "Unknown",
+            seller_name=seller.username if seller else "Game Pay",
             delivery_type=lot.delivery_type.value,
             stock_available=lot.stock_count - lot.reserved_count
         ))
