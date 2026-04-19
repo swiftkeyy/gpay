@@ -14,8 +14,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import jwt
 
-from app.core.database import get_db
-from app.core.models import User
+from app.db.session import get_db
+from app.models.entities import User
 from app.core.config import get_settings
 
 settings = get_settings()

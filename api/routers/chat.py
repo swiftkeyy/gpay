@@ -9,8 +9,8 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPExce
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
 
-from app.core.database import get_db
-from app.core.models import User, Deal, DealMessage
+from app.db.session import get_db
+from app.models.entities import User, Deal, DealMessage
 from api.dependencies.auth import get_current_user_ws
 
 router = APIRouter()

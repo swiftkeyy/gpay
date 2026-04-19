@@ -12,8 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, or_
 from sqlalchemy.orm import selectinload
 
-from app.core.database import get_db
-from app.core.models import User, Seller, Lot, LotImage, LotStockItem, Deal, Transaction, Withdrawal
+from app.db.session import get_db
+from app.models.entities import User, Seller, Lot, Deal, Transaction
 from api.dependencies.auth import get_current_user
 
 router = APIRouter()

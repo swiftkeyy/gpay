@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func, desc
 from sqlalchemy.orm import selectinload
 
-from app.core.database import get_db
-from app.core.models import User, Deal, Order, ProductReview, SellerReview, Seller, Product
+from app.db.session import get_db
+from app.models.entities import User, Deal, Order, Review as ProductReview, Review as SellerReview, Seller, Product
 from api.dependencies.auth import get_current_user, get_current_admin
 
 router = APIRouter()
