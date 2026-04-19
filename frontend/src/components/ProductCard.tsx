@@ -30,7 +30,7 @@ const rarityConfig = {
     shadow: 'hover:shadow-[0_0_20px_rgba(156,163,175,0.4)]',
     glow: 'shadow-[0_0_15px_rgba(156,163,175,0.3)]',
     badge: 'bg-gray-600/80 text-gray-200 border-gray-500/50',
-    badgeText: 'COMMON',
+    badgeText: 'ОБЫЧНЫЙ',
     gradient: 'from-gray-600/20 to-gray-800/20'
   },
   rare: {
@@ -39,7 +39,7 @@ const rarityConfig = {
     shadow: 'hover:shadow-[0_0_25px_rgba(59,130,246,0.5)]',
     glow: 'shadow-[0_0_20px_rgba(59,130,246,0.4)]',
     badge: 'bg-blue-600/80 text-blue-100 border-blue-400/50',
-    badgeText: 'RARE',
+    badgeText: 'РЕДКИЙ',
     gradient: 'from-blue-600/20 to-blue-800/20'
   },
   epic: {
@@ -48,7 +48,7 @@ const rarityConfig = {
     shadow: 'hover:shadow-[0_0_30px_rgba(157,78,221,0.6)]',
     glow: 'shadow-[0_0_25px_rgba(157,78,221,0.5)]',
     badge: 'bg-gradient-to-r from-neon-purple to-purple-600 text-white border-neon-purple/50',
-    badgeText: 'EPIC',
+    badgeText: 'ЭПИЧЕСКИЙ',
     gradient: 'from-neon-purple/20 to-purple-800/20'
   },
   legendary: {
@@ -57,7 +57,7 @@ const rarityConfig = {
     shadow: 'hover:shadow-[0_0_35px_rgba(249,115,22,0.7)]',
     glow: 'shadow-[0_0_30px_rgba(249,115,22,0.6)] animate-pulse-glow',
     badge: 'bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 text-white border-orange-400/50 animate-pulse-glow',
-    badgeText: 'LEGENDARY',
+    badgeText: 'ЛЕГЕНДАРНЫЙ',
     gradient: 'from-orange-600/20 to-red-800/20'
   }
 }
@@ -136,7 +136,7 @@ export default function ProductCard({
           {/* Auto Delivery Badge - Bottom Left */}
           {delivery_type === 'auto' && (
             <div className="absolute bottom-3 left-3 px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 backdrop-blur-md border-2 border-green-400/50 rounded-lg font-gaming text-xs font-black text-white shadow-[0_0_15px_rgba(34,197,94,0.5)]">
-              ⚡ INSTANT
+              ⚡ МОМЕНТАЛЬНО
             </div>
           )}
           
@@ -144,8 +144,8 @@ export default function ProductCard({
           {stock_count === 0 && (
             <div className="absolute inset-0 bg-black/90 backdrop-blur-sm flex items-center justify-center">
               <div className="text-center">
-                <div className="text-neon-red font-gaming font-black text-xl mb-2">SOLD OUT</div>
-                <div className="text-gray-400 font-gaming text-xs">OUT OF STOCK</div>
+                <div className="text-neon-red font-gaming font-black text-xl mb-2">ПРОДАНО</div>
+                <div className="text-gray-400 font-gaming text-xs">НЕТ В НАЛИЧИИ</div>
               </div>
             </div>
           )}
@@ -161,7 +161,7 @@ export default function ProductCard({
           {/* Price and Rating Row */}
           <div className="flex items-center justify-between">
             <div className="flex flex-col">
-              <div className="text-xs text-gray-400 font-gaming mb-0.5">PRICE</div>
+              <div className="text-xs text-gray-400 font-gaming mb-0.5">ЦЕНА</div>
               <div className={`text-3xl font-black font-gaming ${
                 rarity === 'legendary' ? 'text-orange-400 drop-shadow-[0_0_15px_rgba(251,146,60,0.8)]' :
                 rarity === 'epic' ? 'text-neon-purple drop-shadow-[0_0_15px_rgba(157,78,221,0.8)]' :
@@ -176,7 +176,7 @@ export default function ProductCard({
                 ⭐ {rating.toFixed(1)}
               </div>
               <div className="text-xs text-gray-500 font-gaming">
-                {Math.floor(Math.random() * 100 + 20)} reviews
+                {Math.floor(Math.random() * 100 + 20)} отзывов
               </div>
             </div>
           </div>
@@ -214,7 +214,7 @@ export default function ProductCard({
             `}
           >
             <span className="text-lg">💎</span>
-            BUY NOW
+            КУПИТЬ СЕЙЧАС
           </button>
         </div>
       </div>

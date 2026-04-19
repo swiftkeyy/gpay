@@ -217,7 +217,7 @@ export default function HomePage() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="🔍 Search epic items..."
+                placeholder="🔍 Поиск эпичных предметов..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="w-full px-5 py-3 pr-12 bg-black/60 border-2 border-neon-red/50 rounded-xl text-white placeholder-gray-400 font-gaming focus:outline-none focus:border-neon-red focus:scale-[1.02] transition-all shadow-neon-red backdrop-blur-sm"
@@ -245,7 +245,7 @@ export default function HomePage() {
                       : 'bg-black/40 text-gray-400 border-2 border-gray-700 hover:border-neon-red/50 hover:text-white'
                   }`}
                 >
-                  ALL GAMES
+                  ВСЕ ИГРЫ
                 </button>
                 {games.map(game => (
                   <button
@@ -274,18 +274,18 @@ export default function HomePage() {
                   : 'bg-black/40 text-gray-400 border-2 border-gray-700 hover:border-neon-purple/50 hover:text-white'
               }`}
             >
-              🎯 FILTERS
+              🎯 ФИЛЬТРЫ
             </button>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="flex-1 px-4 py-2 bg-black/60 border-2 border-neon-cyan/50 rounded-lg text-white font-gaming text-xs font-bold focus:outline-none focus:border-neon-cyan focus:shadow-neon-cyan transition-all"
             >
-              <option value="popularity">🔥 POPULAR</option>
-              <option value="price_asc">💰 CHEAP FIRST</option>
-              <option value="price_desc">💎 EXPENSIVE FIRST</option>
-              <option value="newest">⚡ NEWEST</option>
-              <option value="rating">⭐ TOP RATED</option>
+              <option value="popularity">🔥 ПОПУЛЯРНОЕ</option>
+              <option value="price_asc">💰 СНАЧАЛА ДЕШЁВЫЕ</option>
+              <option value="price_desc">💎 СНАЧАЛА ДОРОГИЕ</option>
+              <option value="newest">⚡ НОВИНКИ</option>
+              <option value="rating">⭐ ЛУЧШИЕ</option>
             </select>
           </div>
         </div>
@@ -296,13 +296,13 @@ export default function HomePage() {
         <div className="bg-black/80 backdrop-blur-xl border-b border-neon-purple/30 p-4 shadow-neon-purple animate-slide-down">
           <div className="space-y-3">
             <div>
-              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">CATEGORY</label>
+              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">КАТЕГОРИЯ</label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
                 className="w-full px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
               >
-                <option value="">ALL CATEGORIES</option>
+                <option value="">ВСЕ КАТЕГОРИИ</option>
                 {categories.map(cat => (
                   <option key={cat.id} value={cat.id}>{cat.name.toUpperCase()}</option>
                 ))}
@@ -310,31 +310,31 @@ export default function HomePage() {
             </div>
 
             <div>
-              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">DELIVERY</label>
+              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">ДОСТАВКА</label>
               <select
                 value={deliveryType}
                 onChange={(e) => setDeliveryType(e.target.value)}
                 className="w-full px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
               >
-                <option value="">ALL TYPES</option>
-                <option value="auto">⚡ AUTO DELIVERY</option>
-                <option value="manual">👤 MANUAL</option>
+                <option value="">ВСЕ ТИПЫ</option>
+                <option value="auto">⚡ АВТОМАТИЧЕСКАЯ</option>
+                <option value="manual">👤 РУЧНАЯ</option>
               </select>
             </div>
 
             <div>
-              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">PRICE RANGE</label>
+              <label className="block text-xs font-gaming font-bold text-neon-cyan mb-2 tracking-wide">ДИАПАЗОН ЦЕН</label>
               <div className="flex gap-2">
                 <input
                   type="number"
-                  placeholder="MIN"
+                  placeholder="МИН"
                   value={minPrice}
                   onChange={(e) => setMinPrice(e.target.value)}
                   className="flex-1 px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
                 />
                 <input
                   type="number"
-                  placeholder="MAX"
+                  placeholder="МАКС"
                   value={maxPrice}
                   onChange={(e) => setMaxPrice(e.target.value)}
                   className="flex-1 px-3 py-2 bg-black/60 border-2 border-neon-purple/50 rounded-lg text-white font-gaming text-sm focus:outline-none focus:border-neon-purple focus:shadow-neon-purple transition-all"
@@ -346,7 +346,7 @@ export default function HomePage() {
               onClick={clearFilters}
               className="w-full py-2 text-neon-red font-gaming text-sm font-bold hover:text-white transition-colors"
             >
-              ✕ CLEAR ALL
+              ✕ ОЧИСТИТЬ ВСЁ
             </button>
           </div>
         </div>
@@ -357,10 +357,10 @@ export default function HomePage() {
         {loading && lots.length === 0 ? (
           <div className="text-center py-20">
             <div className="inline-block animate-spin text-6xl">⚡</div>
-            <div className="text-neon-cyan font-gaming mt-4">LOADING EPIC ITEMS...</div>
+            <div className="text-neon-cyan font-gaming mt-4">ЗАГРУЗКА ЭПИЧНЫХ ПРЕДМЕТОВ...</div>
           </div>
         ) : lots.length === 0 ? (
-          <div className="text-center py-20 text-gray-500 font-gaming">NO ITEMS FOUND</div>
+          <div className="text-center py-20 text-gray-500 font-gaming">НИЧЕГО НЕ НАЙДЕНО</div>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-4">
