@@ -66,9 +66,20 @@ async def admin_command(
     session: AsyncSession,
     admin: Admin | None = None,
 ) -> None:
+    # Debug logging
+    import logging
+    logger = logging.getLogger(__name__)
+    logger.warning(f"Admin command called: user_id={message.from_user.id if message.from_user else None}, admin={admin}, admin_id={admin.id if admin else None}")
+    
     if message.from_user is None or not _has_access(admin, message.from_user.id):
         help_text = (
             "🔒 <b>У вас нет доступа к админ-панели.</b>\n\n"
+            f"Debug info:\n"
+            f"• user_id: {message.from_user.id if message.from_user else 'None'}\n"
+            f"• admin object: {'Found' if admin else 'None'}\n"
+            f"• admin.id: {admin.id if admin else 'N/A'}\n"
+            f"• admin.role: {admin.role if admin else 'N/A'}\n"
+            f"• admin.is_active: {admin.is_active if admin else 'N/A'}\n\n"
             "Для получения доступа администратор должен выполнить команду:\n\n"
             f"<code>python add_admin.py add {message.from_user.id} super_admin</code>\n\n"
             "📖 Доступные роли:\n"
