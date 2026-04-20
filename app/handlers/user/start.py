@@ -34,6 +34,8 @@ async def _render_home(
     db_user: User,
     admin: Admin | None = None,
 ) -> None:
+    from app.core.config import get_settings
+    settings = get_settings()
     settings_service = SettingsService(session)
 
     welcome = await settings_service.get(
@@ -46,7 +48,7 @@ async def _render_home(
     )
 
     text = main_menu_text(shop_name or "Game Pay", welcome or "Добро пожаловать в Game Pay.")
-    menu = main_menu_kb(is_admin=admin is not None)
+    menu = main_menu_kb(is_admin=admin is not None, webapp_url=settings.webapp_url)
 
     if isinstance(target, Message):
         await target.answer(

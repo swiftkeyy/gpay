@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     super_admin_tg_id: int = Field(0, alias="SUPER_ADMIN_TG_ID")
     second_admin_tg_id: int = Field(0, alias="SECOND_ADMIN_TG_ID")
     
+    # WebApp URL for Mini App
+    webapp_url: str = Field("https://gpay-production.up.railway.app", alias="WEBAPP_URL")
+    
     # CORS settings
     cors_origins: str = Field("*", alias="CORS_ORIGINS")
 

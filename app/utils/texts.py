@@ -4,7 +4,12 @@ from app.models import Game, Order, Product, User
 
 
 def main_menu_text(shop_name: str, welcome_text: str) -> str:
-    return f'🎮 <b>{shop_name}</b>\n\n{welcome_text}'
+    return (
+        f'🎮 <b>{shop_name}</b>\n\n'
+        f'{welcome_text}\n\n'
+        f'💎 <b>Нажми "🛍️ Открыть магазин" для доступа к веб-версии!</b>\n\n'
+        f'Или используй кнопки ниже для быстрого доступа:'
+    )
 
 
 def game_caption(game: Game) -> str:
