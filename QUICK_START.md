@@ -1,105 +1,92 @@
-# Quick Start - P2P Marketplace
+# 🚀 Быстрый Старт - Добавить Себя Админом
 
-## 🚀 Быстрый запуск за 5 минут
+## Шаг 1: Узнай свой Telegram ID
 
-### 1. Backend (2 минуты)
+Открой бота [@userinfobot](https://t.me/userinfobot) и нажми `/start`
+
+Или используй [@getmyid_bot](https://t.me/getmyid_bot)
+
+## Шаг 2: Авторизуйся в приложении
+
+1. Открой своего бота Game Pay
+2. Нажми "🛍️ Открыть магазин"
+3. Дождись загрузки Mini App
+
+## Шаг 3: Добавь себя админом
+
+### Локально (если запускаешь на своем компьютере):
 
 ```bash
 cd ПРОЕКТЫ/gpay-main
-
-# Установить зависимости (если еще не установлены)
-pip install -r requirements.txt
-
-# Создать .env файл
-cat > .env << EOF
-DATABASE_URL=postgresql+asyncpg://user:password@localhost/gpay
-REDIS_URL=redis://localhost:6379
-JWT_SECRET_KEY=your-secret-key-change-this
-BOT_TOKEN=your-telegram-bot-token
-YUKASSA_SHOP_ID=your-shop-id
-YUKASSA_SECRET_KEY=your-secret-key
-EOF
-
-# Запустить миграции
-alembic upgrade head
-
-# Запустить сервер
-uvicorn api.main:app --reload
+python add_admin.py add YOUR_TELEGRAM_ID super_admin
 ```
 
-Backend будет доступен на http://localhost:8000
-
-### 2. Frontend (3 минуты)
+### На Railway:
 
 ```bash
-cd ПРОЕКТЫ/gpay-main/frontend
+# Установи Railway CLI (если еще не установлен)
+npm install -g @railway/cli
 
-# Установить зависимости
-npm install
+# Войди в Railway
+railway login
 
-# Создать .env файл
-cat > .env << EOF
-VITE_API_URL=http://localhost:8000/api/v1
-VITE_WS_URL=ws://localhost:8000/api/v1
-EOF
+# Подключись к проекту
+railway link
 
-# Запустить dev сервер
-npm run dev
+# Добавь себя админом
+railway run python add_admin.py add YOUR_TELEGRAM_ID super_admin
 ```
 
-Frontend будет доступен на http://localhost:3000
+## Шаг 4: Проверь доступ
+
+1. Полностью закрой Mini App
+2. Открой заново
+3. Напиши боту `/admin`
+4. Должна открыться админ-панель! 🎉
 
 ---
 
-## 📝 Что проверить
+## Примеры Команд
 
-### Backend:
-1. Открыть http://localhost:8000/health - должен вернуть `{"status":"ok"}`
-2. Открыть http://localhost:8000/api/docs - Swagger UI
-3. Проверить что PostgreSQL и Redis запущены
+```bash
+# Добавить супер админа
+python add_admin.py add 123456789 super_admin
 
-### Frontend:
-1. Открыть http://localhost:3000
-2. Должна открыться главная страница с каталогом
-3. Проверить консоль браузера на ошибки
+# Добавить модератора
+python add_admin.py add 987654321 moderator
 
----
+# Добавить продавца
+python add_admin.py seller 555555555
 
-## 🐛 Troubleshooting
+# Посмотреть всех админов
+python add_admin.py list
 
-### Backend не запускается:
-- Проверьте что PostgreSQL запущен: `pg_isready`
-- Проверьте что Redis запущен: `redis-cli ping`
-- Проверьте .env файл
-
-### Frontend не запускается:
-- Проверьте версию Node.js: `node --version` (нужна 18+)
-- Удалите node_modules и переустановите: `rm -rf node_modules && npm install`
-- Проверьте .env файл
-
-### Ошибки в консоли браузера:
-- Проверьте что Backend запущен
-- Проверьте CORS настройки в Backend
-- Проверьте URL в .env файле
+# Удалить админа
+python add_admin.py remove 123456789
+```
 
 ---
 
-## 📚 Дополнительная информация
+## Роли
 
-- **Полный статус проекта:** PROJECT_STATUS.md
-- **Статус Frontend:** FRONTEND_STATUS.md
-- **Backend документация:** BACKEND_ГОТОВ.md
-- **Инструкция по деплою:** DEPLOY.md
-
----
-
-## 🎯 Следующие шаги
-
-1. Протестировать основной флоу: регистрация → каталог → корзина → оформление
-2. Доработать ChatPage (см. FRONTEND_STATUS.md)
-3. Добавить формы в SellerDashboard и AdminPanel
-4. Задеплоить на staging
+- **super_admin** 👑 - Полный доступ ко всему
+- **admin** ⚙️ - Управление контентом
+- **moderator** 🛡️ - Модерация отзывов и споров
+- **security** 🔒 - Блокировка пользователей
 
 ---
 
-Made with ❤️ by Kiro AI
+## Troubleshooting
+
+### "User not found"
+➡️ Сначала авторизуйся в Mini App
+
+### Кнопка админки не появилась
+➡️ Полностью закрой и открой Mini App заново
+
+### Railway: "command not found"
+➡️ Установи Railway CLI: `npm install -g @railway/cli`
+
+---
+
+Подробная документация: **ADMIN_MANAGEMENT.md**
