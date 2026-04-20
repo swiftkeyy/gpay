@@ -67,7 +67,18 @@ async def admin_command(
     admin: Admin | None = None,
 ) -> None:
     if message.from_user is None or not _has_access(admin, message.from_user.id):
-        await message.answer("⛔ У вас нет доступа к админ-панели.")
+        help_text = (
+            "🔒 <b>У вас нет доступа к админ-панели.</b>\n\n"
+            "Для получения доступа администратор должен выполнить команду:\n\n"
+            f"<code>python add_admin.py add {message.from_user.id} super_admin</code>\n\n"
+            "📖 Доступные роли:\n"
+            "• <b>super_admin</b> - Полный доступ\n"
+            "• <b>admin</b> - Управление контентом\n"
+            "• <b>moderator</b> - Модерация\n"
+            "• <b>security</b> - Безопасность\n\n"
+            "Подробнее: ADMIN_MANAGEMENT.md"
+        )
+        await message.answer(help_text, parse_mode="HTML")
         return
     await _render_admin_panel(message, session)
 
