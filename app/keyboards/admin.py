@@ -142,7 +142,7 @@ def prices_admin_kb(rows: list[tuple]) -> InlineKeyboardMarkup:
     return b.as_markup()
 
 
-def orders_admin_kb(orders: list) -> InlineKeyboardMarkup:
+def orders_admin_kb(orders: list, filter_status: str | None = None) -> InlineKeyboardMarkup:
     b = InlineKeyboardBuilder()
     for order in orders:
         b.button(
