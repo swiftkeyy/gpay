@@ -93,6 +93,11 @@ class Settings(BaseSettings):
     super_admin_tg_id: int = Field(0, alias="SUPER_ADMIN_TG_ID")
     second_admin_tg_id: int = Field(0, alias="SECOND_ADMIN_TG_ID")
     
+    # JWT settings
+    jwt_secret_key: str = Field("your-secret-key-change-in-production", alias="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
+    jwt_expiration_minutes: int = Field(43200, alias="JWT_EXPIRATION_MINUTES")  # 30 days
+    
     # WebApp URL for Mini App
     webapp_url: str = Field("https://gpay-production.up.railway.app", alias="WEBAPP_URL")
     

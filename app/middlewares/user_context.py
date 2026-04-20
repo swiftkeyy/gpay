@@ -85,6 +85,8 @@ class UserContextMiddleware(BaseMiddleware):
                 Admin.is_active.is_(True),
             )
         )
-        data["admin"] = admin_result.scalar_one_or_none()
+        admin = admin_result.scalar_one_or_none()
+        logger.warning(f"Admin lookup: user_id={db_user.id}, admin_found={'Yes' if admin else 'No'}, admin_id={admin.id if admin else None}, admin_role={admin.role if admin else None}")
+        data["admin"] = admin
 
         return await handler(event, data)
