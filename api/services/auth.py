@@ -92,7 +92,7 @@ class AuthService:
         self, 
         init_data: str,
         referral_code: str | None = None
-    ) -> tuple[User, bool]:
+    ) -> tuple[User, bool, str | None]:
         """Authenticate user via Telegram initData and create/retrieve user.
         
         Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.8
@@ -102,7 +102,7 @@ class AuthService:
             referral_code: Optional referral code from start parameter
             
         Returns:
-            Tuple of (User object, is_new_user boolean)
+            Tuple of (User object, is_new_user boolean, photo_url)
             
         Raises:
             ValueError: If initData validation fails or user data is invalid
@@ -127,6 +127,7 @@ class AuthService:
         telegram_id = user_info.get("id")
         username = user_info.get("username")
         first_name = user_info.get("first_name")
+        photo_url = user_info.get("photo_url")  # Get photo from Telegram
         
         if not telegram_id:
             raise ValueError("Telegram ID not found")
@@ -135,7 +136,7 @@ class AuthService:
         user = await self.user_repo.get_by_telegram_id(telegram_id)
         
         if user:
-            return user, False
+            return user, False, photo_url
         
         # Create new user (Requirement 1.4)
         user = await self._create_new_user(
@@ -145,7 +146,7 @@ class AuthService:
             referral_code=referral_code
         )
         
-        return user, True
+        return user, True, photo_url
 
     async def _create_new_user(
         self,

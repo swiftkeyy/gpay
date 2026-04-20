@@ -98,8 +98,16 @@ export default function ProfilePage() {
       {/* Header */}
       <div className="relative z-10 bg-gradient-to-br from-neon-red via-neon-purple to-neon-cyan p-6 border-b-2 border-neon-red/30 shadow-neon-red">
         <div className="flex items-center gap-4 mb-4">
-          <div className="w-20 h-20 bg-black/60 backdrop-blur-sm border-2 border-neon-gold rounded-full flex items-center justify-center text-4xl animate-float shadow-neon-gold">
-            👤
+          <div className="w-20 h-20 bg-black/60 backdrop-blur-sm border-2 border-neon-gold rounded-full flex items-center justify-center overflow-hidden animate-float shadow-neon-gold">
+            {user.photo_url ? (
+              <img 
+                src={user.photo_url} 
+                alt={user.first_name || user.username || 'User'} 
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-4xl">👤</span>
+            )}
           </div>
           <div className="flex-1">
             <div className="text-2xl font-black font-gaming text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.8)]">

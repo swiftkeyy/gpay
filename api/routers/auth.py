@@ -37,8 +37,9 @@ class UserProfile(BaseModel):
     username: str | None
     first_name: str | None
     balance: float
-    referral_code: str
+    referral_code: str | None
     created_at: str
+    photo_url: str | None = None
 
 
 class AuthResponse(BaseModel):
@@ -79,7 +80,7 @@ async def authenticate_telegram(
     
     try:
         # Authenticate user (validates initData and creates/retrieves user)
-        user, is_new_user = await auth_service.authenticate_user(request.init_data)
+        user, is_new_user, photo_url = await auth_service.authenticate_user(request.init_data)
     except ValueError as e:
         # Requirement 1.3: Return 401 for invalid hash
         raise HTTPException(status_code=401, detail=str(e))
@@ -97,6 +98,7 @@ async def authenticate_telegram(
             first_name=user.first_name,
             balance=float(user.balance),
             referral_code=user.referral_code,
-            created_at=user.created_at.isoformat()
+            created_at=user.created_at.isoformat(),
+            photo_url=photo_url
         )
     )

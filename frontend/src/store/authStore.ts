@@ -9,11 +9,12 @@ interface User {
   username: string | null
   first_name: string | null
   balance: number
-  referral_code: string
+  referral_code: string | null
   language_code: string
   is_admin: boolean
   is_seller: boolean
   created_at: string
+  photo_url?: string | null
 }
 
 interface AuthState {
