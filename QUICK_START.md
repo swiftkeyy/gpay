@@ -23,19 +23,49 @@ python add_admin.py add YOUR_TELEGRAM_ID super_admin
 
 ### На Railway:
 
+**Вариант A: Railway CLI (Рекомендуется)**
+
 ```bash
-# Установи Railway CLI (если еще не установлен)
+# 1. Установи Railway CLI
 npm install -g @railway/cli
 
-# Войди в Railway
+# Или через PowerShell:
+iwr https://railway.app/install.ps1 | iex
+
+# 2. Войди в Railway
 railway login
 
-# Подключись к проекту
+# 3. Подключись к проекту
+cd ПРОЕКТЫ/gpay-main
 railway link
 
-# Добавь себя админом
+# 4. Добавь себя админом
 railway run python add_admin.py add YOUR_TELEGRAM_ID super_admin
 ```
+
+**Вариант B: Через SQL в Railway Dashboard**
+
+1. Открой [railway.app](https://railway.app) → твой проект
+2. Выбери сервис **Postgres** → **Data** → **Query**
+3. Узнай свой user_id:
+   ```sql
+   SELECT id FROM users WHERE telegram_id = YOUR_TELEGRAM_ID;
+   ```
+4. Добавь админа (замени USER_ID на результат из шага 3):
+   ```sql
+   INSERT INTO admins (user_id, role, is_active, created_at)
+   VALUES (USER_ID, 'super_admin', true, NOW());
+   ```
+
+**Вариант C: Через переменные окружения**
+
+1. Railway Dashboard → твой проект → сервис **web** → **Variables**
+2. Добавь переменную:
+   - Name: `SUPER_ADMIN_TG_ID`
+   - Value: `YOUR_TELEGRAM_ID`
+3. Redeploy сервис
+
+📖 Подробнее: **RAILWAY_ADMIN_SETUP.md**
 
 ## Шаг 4: Проверь доступ
 
