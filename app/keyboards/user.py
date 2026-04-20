@@ -13,13 +13,14 @@ def _safe_id(obj) -> int:
 def main_menu_kb(*, is_admin: bool = False, webapp_url: str | None = None) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
 
-    # WebApp button - first and most prominent
-    if webapp_url:
-        from aiogram.types import WebAppInfo
-        builder.button(
-            text="🛍️ Открыть магазин",
-            web_app=WebAppInfo(url=webapp_url)
-        )
+    # WebApp button - temporarily disabled until frontend is deployed
+    # TODO: Enable when frontend is deployed to Railway
+    # if webapp_url:
+    #     from aiogram.types import WebAppInfo
+    #     builder.button(
+    #         text="🛍️ Открыть магазин",
+    #         web_app=WebAppInfo(url=webapp_url)
+    #     )
 
     builder.button(text="🎮 Игры", callback_data=NavCb(target="games").pack())
     builder.button(text="🛒 Корзина", callback_data=NavCb(target="cart").pack())
@@ -36,15 +37,9 @@ def main_menu_kb(*, is_admin: bool = False, webapp_url: str | None = None) -> In
 
     if is_admin:
         builder.button(text="👮 Админка", callback_data=NavCb(target="admin_panel").pack())
-        if webapp_url:
-            builder.adjust(1, 2, 2, 2, 2, 2, 1, 1, 1)  # WebApp button on its own row
-        else:
-            builder.adjust(2, 2, 2, 2, 2, 1, 1, 1)
+        builder.adjust(2, 2, 2, 2, 2, 1, 1, 1)
     else:
-        if webapp_url:
-            builder.adjust(1, 2, 2, 2, 2, 2, 1, 1)  # WebApp button on its own row
-        else:
-            builder.adjust(2, 2, 2, 2, 2, 1, 1)
+        builder.adjust(2, 2, 2, 2, 2, 1, 1)
     return builder.as_markup()
 
 
