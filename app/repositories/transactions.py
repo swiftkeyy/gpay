@@ -264,8 +264,21 @@ class NotificationRepository(BaseRepository[Notification]):
         title: str,
         message: str,
         reference_type: str | None = None,
-        reference_id: int | None = None
+        reference_id: int | None = None,
+        bot_notification_data: dict | None = None
     ) -> Notification:
+        """
+        Create a notification and optionally send bot push notification.
+        
+        Args:
+            user_id: User ID to send notification to
+            notification_type: Type of notification
+            title: Notification title
+            message: Notification message
+            reference_type: Type of referenced entity
+            reference_id: ID of referenced entity
+            bot_notification_data: Additional data for bot push notification (optional)
+        """
         notification = Notification(
             user_id=user_id,
             notification_type=notification_type,
@@ -276,4 +289,29 @@ class NotificationRepository(BaseRepository[Notification]):
         )
         self.session.add(notification)
         await self.session.flush()
+        
+        # Send bot push notification if data provided
+        if bot_notification_data:
+            try:
+                # Get user's telegram_id
+                from app.models.entities import User
+                result = await self.session.execute(
+                    select(User).where(User.id == user_id)
+                )
+                user = result.scalar_one_or_none()
+                
+                if user and user.telegram_id:
+                    from app.services.bot_notifications import send_bot_notification
+                    # Map NotificationType enum to string
+                    notif_type_str = notification_type.value if hasattr(notification_type, 'value') else str(notification_type)
+                    await send_bot_notification(
+                        notification_type=notif_type_str,
+                        user_telegram_id=user.telegram_id,
+                        **bot_notification_data
+                    )
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Error sending bot notification: {e}")
+        
         return notification

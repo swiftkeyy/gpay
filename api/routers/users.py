@@ -189,17 +189,20 @@ async def get_user_referrals(
     current_user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Get referral stats."""
+    """Get referral stats.
+    
+    **Validates Requirements 14.5**: Returns count of invited users and total rewards earned.
+    """
     from sqlalchemy import select, func
     from app.models import User as UserModel
     
-    # Get total referrals count
+    # Get total referrals count (Requirement 14.5)
     result = await session.execute(
-        select(func.count(UserModel.id)).where(UserModel.referred_by_id == current_user.id)
+        select(func.count(UserModel.id)).where(UserModel.referred_by_user_id == current_user.id)
     )
     total_referrals = result.scalar() or 0
     
-    # Get total earned from referrals (from transactions)
+    # Get total earned from referrals (from transactions) (Requirement 14.5)
     from app.models import Transaction
     from app.models.enums import TransactionType
     

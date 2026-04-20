@@ -11,55 +11,7 @@ interface ProductCardProps {
   rating: number
   delivery_type: string
   stock_count: number
-  is_featured: boolean
   onAddToCart: (e: React.MouseEvent) => void
-}
-
-// Определяем редкость на основе цены и featured статуса
-const getRarity = (price: number, is_featured: boolean) => {
-  if (is_featured || price > 5000) return 'legendary'
-  if (price > 2000) return 'epic'
-  if (price > 500) return 'rare'
-  return 'common'
-}
-
-const rarityConfig = {
-  common: {
-    border: 'border-gray-500/50',
-    borderHover: 'hover:border-gray-400',
-    shadow: 'hover:shadow-[0_0_20px_rgba(156,163,175,0.4)]',
-    glow: 'shadow-[0_0_15px_rgba(156,163,175,0.3)]',
-    badge: 'bg-gray-600/80 text-gray-200 border-gray-500/50',
-    badgeText: 'ОБЫЧНЫЙ',
-    gradient: 'from-gray-600/20 to-gray-800/20'
-  },
-  rare: {
-    border: 'border-blue-500/50',
-    borderHover: 'hover:border-blue-400',
-    shadow: 'hover:shadow-[0_0_25px_rgba(59,130,246,0.5)]',
-    glow: 'shadow-[0_0_20px_rgba(59,130,246,0.4)]',
-    badge: 'bg-blue-600/80 text-blue-100 border-blue-400/50',
-    badgeText: 'РЕДКИЙ',
-    gradient: 'from-blue-600/20 to-blue-800/20'
-  },
-  epic: {
-    border: 'border-neon-purple/50',
-    borderHover: 'hover:border-neon-purple',
-    shadow: 'hover:shadow-[0_0_30px_rgba(157,78,221,0.6)]',
-    glow: 'shadow-[0_0_25px_rgba(157,78,221,0.5)]',
-    badge: 'bg-gradient-to-r from-neon-purple to-purple-600 text-white border-neon-purple/50',
-    badgeText: 'ЭПИЧЕСКИЙ',
-    gradient: 'from-neon-purple/20 to-purple-800/20'
-  },
-  legendary: {
-    border: 'border-orange-500/50',
-    borderHover: 'hover:border-orange-400',
-    shadow: 'hover:shadow-[0_0_35px_rgba(249,115,22,0.7)]',
-    glow: 'shadow-[0_0_30px_rgba(249,115,22,0.6)] animate-pulse-glow',
-    badge: 'bg-gradient-to-r from-orange-500 via-red-500 to-orange-600 text-white border-orange-400/50 animate-pulse-glow',
-    badgeText: 'ЛЕГЕНДАРНЫЙ',
-    gradient: 'from-orange-600/20 to-red-800/20'
-  }
 }
 
 export default function ProductCard({
@@ -73,7 +25,6 @@ export default function ProductCard({
   rating,
   delivery_type,
   stock_count,
-  is_featured,
   onAddToCart
 }: ProductCardProps) {
 

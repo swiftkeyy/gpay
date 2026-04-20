@@ -127,6 +127,7 @@
     "title": "Чат",
     "typing": "печатает...",
     "reconnecting": "Переподключение...",
+    "syncing": "Синхронизация сообщений...",
     "connectionLost": "Соединение потеряно",
     "sendMessage": "Отправить",
     "messagePlaceholder": "Сообщение...",

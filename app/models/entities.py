@@ -20,7 +20,7 @@ from sqlalchemy import (
     func,
     text as sa_text,
 )
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -299,6 +299,8 @@ class PromoCodeUsage(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     order_id: Mapped[int | None] = mapped_column(ForeignKey("orders.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    user: Mapped["User"] = relationship()
 
 
 class Order(Base, TimestampMixin):
@@ -403,14 +405,21 @@ class Review(Base, TimestampMixin):
     product_id: Mapped[int | None] = mapped_column(ForeignKey("products.id", ondelete="SET NULL"), nullable=True)
     rating: Mapped[int] = mapped_column(Integer, nullable=False)
     text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photos: Mapped[list[int] | None] = mapped_column(ARRAY(Integer), nullable=True)
     status: Mapped[ReviewStatus] = mapped_column(
         SAEnum(ReviewStatus, name="review_status_enum", values_callable=enum_values),
         nullable=False,
         default=ReviewStatus.HIDDEN,
         server_default=sa_text("'hidden'"),
     )
+    reply_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    replied_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     moderated_by_admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
     moderated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    rejection_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    
+    user: Mapped["User"] = relationship()
+    order: Mapped["Order"] = relationship()
 
 
 class Referral(Base, TimestampMixin):
@@ -641,6 +650,7 @@ class Deal(Base, TimestampMixin):
     seller_amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     escrow_released: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
     escrow_released_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     auto_complete_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     buyer_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_text("false"))
@@ -683,6 +693,7 @@ class DealDispute(Base, TimestampMixin):
     deal_id: Mapped[int] = mapped_column(ForeignKey("deals.id", ondelete="CASCADE"), nullable=False)
     initiator_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     status: Mapped[DisputeStatus] = mapped_column(
         SAEnum(DisputeStatus, name="dispute_status_enum", values_callable=enum_values),
         nullable=False,
@@ -690,8 +701,13 @@ class DealDispute(Base, TimestampMixin):
         server_default=sa_text("'open'"),
     )
     admin_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    admin_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolution: Mapped[str | None] = mapped_column(Text, nullable=True)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_by_id: Mapped[int | None] = mapped_column(ForeignKey("admins.id", ondelete="SET NULL"), nullable=True)
+    
+    deal: Mapped["Deal"] = relationship()
+    initiator: Mapped["User"] = relationship(foreign_keys=[initiator_id])
 
 
 class Transaction(Base):

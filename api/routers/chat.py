@@ -8,9 +8,10 @@ from typing import Dict, Set, Optional
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_
+from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.models.entities import User, Deal, DealMessage
+from app.models.entities import User, Deal, DealMessage, Seller
 from api.dependencies.auth import get_current_user_ws, get_current_user
 
 router = APIRouter()
@@ -110,7 +111,9 @@ async def websocket_chat_endpoint(
     
     # Verify deal exists and user is participant
     result = await db.execute(
-        select(Deal).where(Deal.id == deal_id)
+        select(Deal)
+        .options(selectinload(Deal.seller))
+        .where(Deal.id == deal_id)
     )
     deal = result.scalar_one_or_none()
     
@@ -118,8 +121,9 @@ async def websocket_chat_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
     
-    # Check if user is buyer or seller
-    if user.id != deal.buyer_id and user.id != deal.seller_id:
+    # Check if user is buyer or seller (seller.user_id for seller)
+    seller_user_id = deal.seller.user_id
+    if user.id != deal.buyer_id and user.id != seller_user_id:
         logger.warning(f"User {user.id} tried to access deal {deal_id} chat without permission")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
@@ -127,11 +131,20 @@ async def websocket_chat_endpoint(
     # Connect user
     await manager.connect(websocket, deal_id, user.id)
     
-    # Send connection confirmation
+    # Send connection confirmation with last message ID for sync
+    result = await db.execute(
+        select(DealMessage)
+        .where(DealMessage.deal_id == deal_id)
+        .order_by(DealMessage.created_at.desc())
+        .limit(1)
+    )
+    last_message = result.scalar_one_or_none()
+    
     await websocket.send_json({
         "type": "connected",
         "deal_id": deal_id,
         "user_id": user.id,
+        "last_message_id": last_message.id if last_message else None,
         "timestamp": datetime.utcnow().isoformat()
     })
     
@@ -144,14 +157,14 @@ async def websocket_chat_endpoint(
             
             if message_type == "text":
                 # Save message to database
-                content = message_data.get("content", "").strip()
-                if not content:
+                message_text = message_data.get("message_text", "").strip()
+                if not message_text:
                     continue
                 
                 new_message = DealMessage(
                     deal_id=deal_id,
                     sender_id=user.id,
-                    content=content,
+                    message_text=message_text,
                     is_read=False
                 )
                 db.add(new_message)
@@ -164,7 +177,7 @@ async def websocket_chat_endpoint(
                     "message_id": new_message.id,
                     "deal_id": deal_id,
                     "sender_id": user.id,
-                    "content": content,
+                    "message_text": message_text,
                     "is_read": False,
                     "created_at": new_message.created_at.isoformat()
                 }
@@ -173,7 +186,7 @@ async def websocket_chat_endpoint(
                 await manager.send_personal_message(response, deal_id, user.id)
                 
                 # Send to other party
-                other_user_id = deal.seller_id if user.id == deal.buyer_id else deal.buyer_id
+                other_user_id = seller_user_id if user.id == deal.buyer_id else deal.buyer_id
                 await manager.send_personal_message(response, deal_id, other_user_id)
                 
                 logger.info(f"Message {new_message.id} sent in deal {deal_id} by user {user.id}")
@@ -181,7 +194,7 @@ async def websocket_chat_endpoint(
             elif message_type == "typing":
                 # Broadcast typing indicator to other party
                 is_typing = message_data.get("is_typing", False)
-                other_user_id = deal.seller_id if user.id == deal.buyer_id else deal.buyer_id
+                other_user_id = seller_user_id if user.id == deal.buyer_id else deal.buyer_id
                 
                 await manager.send_personal_message({
                     "type": "typing",
@@ -238,7 +251,7 @@ async def websocket_chat_endpoint(
                 await db.commit()
                 
                 # Notify other party
-                other_user_id = deal.seller_id if user.id == deal.buyer_id else deal.buyer_id
+                other_user_id = seller_user_id if user.id == deal.buyer_id else deal.buyer_id
                 await manager.send_personal_message({
                     "type": "read_all_receipt",
                     "read_by": user.id,
@@ -249,6 +262,51 @@ async def websocket_chat_endpoint(
             elif message_type == "ping":
                 # Heartbeat
                 await websocket.send_json({"type": "pong"})
+            
+            elif message_type == "get_missed_messages":
+                # Client requests messages since last_message_id
+                last_message_id = message_data.get("last_message_id")
+                
+                if last_message_id:
+                    # Get messages after the specified ID
+                    result = await db.execute(
+                        select(DealMessage)
+                        .where(
+                            and_(
+                                DealMessage.deal_id == deal_id,
+                                DealMessage.id > last_message_id
+                            )
+                        )
+                        .order_by(DealMessage.created_at.asc())
+                    )
+                else:
+                    # Get recent messages if no last_message_id provided
+                    result = await db.execute(
+                        select(DealMessage)
+                        .where(DealMessage.deal_id == deal_id)
+                        .order_by(DealMessage.created_at.desc())
+                        .limit(50)
+                    )
+                
+                missed_messages = result.scalars().all()
+                
+                # Send missed messages to client
+                for msg in missed_messages:
+                    await websocket.send_json({
+                        "type": "message",
+                        "message_id": msg.id,
+                        "deal_id": deal_id,
+                        "sender_id": msg.sender_id,
+                        "message_text": msg.message_text,
+                        "is_read": msg.is_read,
+                        "created_at": msg.created_at.isoformat()
+                    })
+                
+                # Send sync complete notification
+                await websocket.send_json({
+                    "type": "sync_complete",
+                    "count": len(missed_messages)
+                })
     
     except WebSocketDisconnect:
         manager.disconnect(deal_id, user.id)
@@ -273,14 +331,17 @@ async def get_deal_messages(
     """
     # Verify deal exists and user is participant
     result = await db.execute(
-        select(Deal).where(Deal.id == deal_id)
+        select(Deal)
+        .options(selectinload(Deal.seller))
+        .where(Deal.id == deal_id)
     )
     deal = result.scalar_one_or_none()
     
     if not deal:
         raise HTTPException(status_code=404, detail="Deal not found")
     
-    if current_user.id != deal.buyer_id and current_user.id != deal.seller_id:
+    seller_user_id = deal.seller.user_id
+    if current_user.id != deal.buyer_id and current_user.id != seller_user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Get messages
@@ -299,7 +360,7 @@ async def get_deal_messages(
             {
                 "id": msg.id,
                 "sender_id": msg.sender_id,
-                "content": msg.content,
+                "message_text": msg.message_text,
                 "is_read": msg.is_read,
                 "read_at": msg.read_at.isoformat() if msg.read_at else None,
                 "created_at": msg.created_at.isoformat()
@@ -321,14 +382,17 @@ async def get_unread_count(
     """Get count of unread messages in a deal."""
     # Verify deal exists and user is participant
     result = await db.execute(
-        select(Deal).where(Deal.id == deal_id)
+        select(Deal)
+        .options(selectinload(Deal.seller))
+        .where(Deal.id == deal_id)
     )
     deal = result.scalar_one_or_none()
     
     if not deal:
         raise HTTPException(status_code=404, detail="Deal not found")
     
-    if current_user.id != deal.buyer_id and current_user.id != deal.seller_id:
+    seller_user_id = deal.seller.user_id
+    if current_user.id != deal.buyer_id and current_user.id != seller_user_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     # Count unread messages from other party

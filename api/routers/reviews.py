@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 from typing import Optional, List
 from decimal import Decimal
 
@@ -12,7 +13,17 @@ from sqlalchemy import select, and_, func, desc
 from sqlalchemy.orm import selectinload
 
 from app.db.session import get_db
-from app.models.entities import User, Deal, Order, Review as ProductReview, Review as SellerReview, Seller, Product
+from app.models.entities import (
+    User, 
+    Deal, 
+    Order, 
+    OrderItem,
+    Review as ProductReview, 
+    SellerReview, 
+    Seller, 
+    Product
+)
+from app.models.enums import ReviewStatus, OrderStatus, DealStatus
 from api.dependencies.auth import get_current_user, get_current_admin
 
 router = APIRouter()
@@ -21,9 +32,10 @@ logger = logging.getLogger(__name__)
 
 # Pydantic models
 class ProductReviewCreate(BaseModel):
-    rating: int = Field(..., ge=1, le=5)
-    text: Optional[str] = Field(None, max_length=2000)
-    photos: Optional[List[str]] = Field(None, max_items=5)
+    rating: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
+    text: Optional[str] = Field(None, max_length=2000, description="Review text (max 2000 characters)")
+    # Note: Photo support requires database schema update (photos field or review_photos table)
+    # photos: Optional[List[int]] = Field(None, max_items=5, description="List of media file IDs (max 5)")
 
 
 class SellerReviewCreate(BaseModel):
@@ -56,7 +68,7 @@ async def get_product_reviews(
         .where(
             and_(
                 ProductReview.product_id == product_id,
-                ProductReview.status == 'published'
+                ProductReview.status == ReviewStatus.PUBLISHED
             )
         )
         .order_by(desc(ProductReview.created_at))
@@ -70,7 +82,7 @@ async def get_product_reviews(
         select(func.avg(ProductReview.rating)).where(
             and_(
                 ProductReview.product_id == product_id,
-                ProductReview.status == 'published'
+                ProductReview.status == ReviewStatus.PUBLISHED
             )
         )
     )
@@ -81,7 +93,7 @@ async def get_product_reviews(
         select(func.count(ProductReview.id)).where(
             and_(
                 ProductReview.product_id == product_id,
-                ProductReview.status == 'published'
+                ProductReview.status == ReviewStatus.PUBLISHED
             )
         )
     )
@@ -108,32 +120,64 @@ async def get_product_reviews(
     }
 
 
-@router.post("/orders/{order_id}/review")
+@router.post("/orders/{order_id}/review", status_code=status.HTTP_201_CREATED)
 async def create_product_review(
     order_id: int,
     request: ProductReviewCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create product review."""
-    # Get order
+    """
+    Create product review for a completed order.
+    
+    Requirements implemented:
+    - 11.1: POST /api/v1/orders/{id}/review endpoint
+    - 11.3: Validate rating (1-5) and text (max 2000 chars)
+    - 11.10: Set status to pending (HIDDEN) for moderation
+    
+    Note: Photo support (11.4) requires database schema update.
+    """
+    # Get order with items
     result = await db.execute(
-        select(Order).where(Order.id == order_id)
+        select(Order)
+        .options(selectinload(Order.items))
+        .where(Order.id == order_id)
     )
     order = result.scalar_one_or_none()
     
     if not order:
-        raise HTTPException(status_code=404, detail="Order not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="Order not found"
+        )
     
-    # Check if user is buyer
+    # Check if user is the buyer
     if order.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your order")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, 
+            detail="You can only review your own orders"
+        )
     
     # Check if order is completed
-    if order.status != "completed":
-        raise HTTPException(status_code=400, detail="Order not completed")
+    if order.status != OrderStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail=f"Cannot review order with status '{order.status.value}'. Order must be completed."
+        )
     
-    # Check if review already exists
+    # Check if order has items
+    if not order.items:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Order has no items to review"
+        )
+    
+    # Get the first product from order items (for now, assuming one product per order)
+    # TODO: In future, support multiple reviews per order (one per product)
+    first_item = order.items[0]
+    product_id = first_item.product_id
+    
+    # Check if review already exists for this order
     result = await db.execute(
         select(ProductReview).where(
             and_(
@@ -145,28 +189,38 @@ async def create_product_review(
     existing_review = result.scalar_one_or_none()
     
     if existing_review:
-        raise HTTPException(status_code=400, detail="Review already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, 
+            detail="You have already reviewed this order"
+        )
     
-    # Create review
+    # Create review with status HIDDEN (pending moderation)
     review = ProductReview(
         user_id=current_user.id,
         order_id=order_id,
-        product_id=order.product_id,
+        product_id=product_id,
         rating=request.rating,
         text=request.text,
-        photos=request.photos,
-        status="pending"
+        status=ReviewStatus.HIDDEN  # HIDDEN serves as "pending" status
     )
     db.add(review)
     await db.commit()
     await db.refresh(review)
     
-    logger.info(f"Product review created: id={review.id}, order_id={order_id}, user_id={current_user.id}")
+    logger.info(
+        f"Product review created: review_id={review.id}, order_id={order_id}, "
+        f"user_id={current_user.id}, rating={request.rating}"
+    )
     
     return {
         "review_id": review.id,
+        "order_id": order_id,
+        "product_id": product_id,
+        "rating": review.rating,
+        "text": review.text,
         "status": "pending",
-        "message": "Review submitted for moderation"
+        "message": "Review submitted for moderation",
+        "created_at": review.created_at.isoformat()
     }
 
 
@@ -182,11 +236,11 @@ async def get_seller_reviews(
     # Get published reviews
     result = await db.execute(
         select(SellerReview)
-        .options(selectinload(SellerReview.user))
+        .options(selectinload(SellerReview.buyer))
         .where(
             and_(
                 SellerReview.seller_id == seller_id,
-                SellerReview.status == 'published'
+                SellerReview.status == ReviewStatus.PUBLISHED
             )
         )
         .order_by(desc(SellerReview.created_at))
@@ -200,7 +254,7 @@ async def get_seller_reviews(
         select(func.avg(SellerReview.rating)).where(
             and_(
                 SellerReview.seller_id == seller_id,
-                SellerReview.status == 'published'
+                SellerReview.status == ReviewStatus.PUBLISHED
             )
         )
     )
@@ -211,7 +265,7 @@ async def get_seller_reviews(
         select(func.count(SellerReview.id)).where(
             and_(
                 SellerReview.seller_id == seller_id,
-                SellerReview.status == 'published'
+                SellerReview.status == ReviewStatus.PUBLISHED
             )
         )
     )
@@ -221,11 +275,11 @@ async def get_seller_reviews(
         "items": [
             {
                 "id": review.id,
-                "user_id": review.user_id,
-                "username": review.user.username if review.user else "Anonymous",
+                "buyer_id": review.buyer_id,
+                "username": review.buyer.username if review.buyer else "Anonymous",
                 "rating": review.rating,
                 "text": review.text,
-                "reply_text": review.reply_text,
+                "reply_text": review.seller_reply,
                 "created_at": review.created_at.isoformat()
             }
             for review in reviews
@@ -237,14 +291,21 @@ async def get_seller_reviews(
     }
 
 
-@router.post("/deals/{deal_id}/review")
+@router.post("/deals/{deal_id}/review", status_code=status.HTTP_201_CREATED)
 async def create_seller_review(
     deal_id: int,
     request: SellerReviewCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Create seller review."""
+    """
+    Create seller review for a completed deal.
+    
+    Requirements implemented:
+    - 11.2: POST /api/v1/deals/{id}/review endpoint
+    - 11.4: Validate rating (1-5) and text (max 2000 chars)
+    - Set status to pending for admin moderation
+    """
     # Get deal
     result = await db.execute(
         select(Deal).where(Deal.id == deal_id)
@@ -252,53 +313,184 @@ async def create_seller_review(
     deal = result.scalar_one_or_none()
     
     if not deal:
-        raise HTTPException(status_code=404, detail="Deal not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Deal not found"
+        )
     
-    # Check if user is buyer
+    # Check if user is the buyer
     if deal.buyer_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Not your deal")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only review deals where you are the buyer"
+        )
     
     # Check if deal is completed
-    if deal.status != "completed":
-        raise HTTPException(status_code=400, detail="Deal not completed")
+    if deal.status != DealStatus.COMPLETED:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Cannot review deal with status '{deal.status.value}'. Deal must be completed."
+        )
     
-    # Check if review already exists
+    # Check if review already exists for this deal
     result = await db.execute(
         select(SellerReview).where(
             and_(
                 SellerReview.deal_id == deal_id,
-                SellerReview.user_id == current_user.id
+                SellerReview.buyer_id == current_user.id
             )
         )
     )
     existing_review = result.scalar_one_or_none()
     
     if existing_review:
-        raise HTTPException(status_code=400, detail="Review already exists")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="You have already reviewed this deal"
+        )
     
-    # Create review
+    # Create review with status HIDDEN (pending moderation)
+    # Note: Using HIDDEN as "pending" status per requirement 11.4
     review = SellerReview(
-        user_id=current_user.id,
+        buyer_id=current_user.id,
         deal_id=deal_id,
         seller_id=deal.seller_id,
         rating=request.rating,
         text=request.text,
-        status="pending"
+        status=ReviewStatus.HIDDEN  # HIDDEN serves as "pending" status
     )
     db.add(review)
     await db.commit()
     await db.refresh(review)
     
-    logger.info(f"Seller review created: id={review.id}, deal_id={deal_id}, user_id={current_user.id}")
+    logger.info(
+        f"Seller review created: review_id={review.id}, deal_id={deal_id}, "
+        f"buyer_id={current_user.id}, seller_id={deal.seller_id}, rating={request.rating}"
+    )
     
     return {
         "review_id": review.id,
+        "deal_id": deal_id,
+        "seller_id": deal.seller_id,
+        "rating": review.rating,
+        "text": review.text,
         "status": "pending",
-        "message": "Review submitted for moderation"
+        "message": "Review submitted for moderation",
+        "created_at": review.created_at.isoformat()
     }
 
 
 # Review replies (seller can reply to their reviews)
+@router.post("/reviews/{review_id}/reply")
+async def reply_to_review(
+    review_id: int,
+    request: ReviewReply,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Reply to a review (product or seller review).
+    
+    Requirements implemented:
+    - 11.6: POST /api/v1/reviews/{id}/reply endpoint for sellers
+    
+    Sellers can reply to reviews of their products or their seller profile.
+    """
+    # Try to find product review first
+    result = await db.execute(
+        select(ProductReview).options(selectinload(ProductReview.order)).where(ProductReview.id == review_id)
+    )
+    product_review = result.scalar_one_or_none()
+    
+    if product_review:
+        # Get seller from order
+        result = await db.execute(
+            select(Deal).where(Deal.order_id == product_review.order_id)
+        )
+        deal = result.scalar_one_or_none()
+        
+        if not deal:
+            raise HTTPException(status_code=404, detail="Deal not found for this review")
+        
+        # Check if user is the seller
+        result = await db.execute(
+            select(Seller).where(
+                and_(
+                    Seller.id == deal.seller_id,
+                    Seller.user_id == current_user.id
+                )
+            )
+        )
+        seller = result.scalar_one_or_none()
+        
+        if not seller:
+            raise HTTPException(status_code=403, detail="You can only reply to reviews of your products")
+        
+        # Check if already replied
+        if product_review.reply_text:
+            raise HTTPException(status_code=400, detail="You have already replied to this review")
+        
+        # Add reply
+        product_review.reply_text = request.reply_text
+        product_review.replied_at = datetime.utcnow()
+        
+        await db.commit()
+        
+        logger.info(
+            f"Product review reply added: review_id={review_id}, seller_id={seller.id}"
+        )
+        
+        return {
+            "message": "Reply added successfully",
+            "review_id": review_id,
+            "reply_text": request.reply_text
+        }
+    
+    # Try to find seller review
+    result = await db.execute(
+        select(SellerReview).where(SellerReview.id == review_id)
+    )
+    seller_review = result.scalar_one_or_none()
+    
+    if seller_review:
+        # Check if user is the seller
+        result = await db.execute(
+            select(Seller).where(
+                and_(
+                    Seller.id == seller_review.seller_id,
+                    Seller.user_id == current_user.id
+                )
+            )
+        )
+        seller = result.scalar_one_or_none()
+        
+        if not seller:
+            raise HTTPException(status_code=403, detail="You can only reply to your own seller reviews")
+        
+        # Check if already replied
+        if seller_review.seller_reply:
+            raise HTTPException(status_code=400, detail="You have already replied to this review")
+        
+        # Add reply
+        seller_review.seller_reply = request.reply_text
+        seller_review.seller_replied_at = datetime.utcnow()
+        
+        await db.commit()
+        
+        logger.info(
+            f"Seller review reply added: review_id={review_id}, seller_id={seller.id}"
+        )
+        
+        return {
+            "message": "Reply added successfully",
+            "review_id": review_id,
+            "reply_text": request.reply_text
+        }
+    
+    # Review not found
+    raise HTTPException(status_code=404, detail="Review not found")
+
+
 @router.post("/reviews/seller/{review_id}/reply")
 async def reply_to_seller_review(
     review_id: int,
@@ -306,7 +498,7 @@ async def reply_to_seller_review(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Reply to seller review."""
+    """Reply to seller review (deprecated - use /reviews/{id}/reply instead)."""
     # Get review
     result = await db.execute(
         select(SellerReview).where(SellerReview.id == review_id)
@@ -331,12 +523,12 @@ async def reply_to_seller_review(
         raise HTTPException(status_code=403, detail="Not your review")
     
     # Check if already replied
-    if review.reply_text:
+    if review.seller_reply:
         raise HTTPException(status_code=400, detail="Already replied")
     
     # Add reply
-    review.reply_text = request.reply_text
-    review.replied_at = datetime.utcnow()
+    review.seller_reply = request.reply_text
+    review.seller_replied_at = datetime.utcnow()
     
     await db.commit()
     
@@ -416,7 +608,7 @@ async def get_pending_reviews(
         result = await db.execute(
             select(ProductReview)
             .options(selectinload(ProductReview.user))
-            .where(ProductReview.status == 'pending')
+            .where(ProductReview.status == ReviewStatus.HIDDEN)
             .order_by(desc(ProductReview.created_at))
             .offset(skip)
             .limit(limit)
@@ -441,8 +633,8 @@ async def get_pending_reviews(
     if review_type in ["all", "seller"]:
         result = await db.execute(
             select(SellerReview)
-            .options(selectinload(SellerReview.user))
-            .where(SellerReview.status == 'pending')
+            .options(selectinload(SellerReview.buyer))
+            .where(SellerReview.status == ReviewStatus.HIDDEN)
             .order_by(desc(SellerReview.created_at))
             .offset(skip)
             .limit(limit)
@@ -453,8 +645,8 @@ async def get_pending_reviews(
             {
                 "id": review.id,
                 "type": "seller",
-                "user_id": review.user_id,
-                "username": review.user.username if review.user else "Anonymous",
+                "buyer_id": review.buyer_id,
+                "username": review.buyer.username if review.buyer else "Anonymous",
                 "seller_id": review.seller_id,
                 "rating": review.rating,
                 "text": review.text,
@@ -487,9 +679,16 @@ async def moderate_product_review(
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    review.status = request.status
+    # Convert string status to ReviewStatus enum
+    if request.status == "published":
+        review.status = ReviewStatus.PUBLISHED
+    elif request.status == "rejected":
+        review.status = ReviewStatus.REJECTED
+    else:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be 'published' or 'rejected'")
+    
     review.moderated_at = datetime.utcnow()
-    review.moderated_by = current_admin.id
+    review.moderated_by_admin_id = current_admin.id
     
     if request.rejection_reason:
         review.rejection_reason = request.rejection_reason
@@ -500,7 +699,7 @@ async def moderate_product_review(
             select(func.avg(ProductReview.rating)).where(
                 and_(
                     ProductReview.product_id == review.product_id,
-                    ProductReview.status == 'published'
+                    ProductReview.status == ReviewStatus.PUBLISHED
                 )
             )
         )
@@ -516,9 +715,14 @@ async def moderate_product_review(
     
     await db.commit()
     
+    logger.info(
+        f"Product review moderated: review_id={review.id}, status={request.status}, "
+        f"admin_id={current_admin.id}"
+    )
+    
     return {
         "id": review.id,
-        "status": review.status
+        "status": request.status
     }
 
 
@@ -538,12 +742,13 @@ async def moderate_seller_review(
     if not review:
         raise HTTPException(status_code=404, detail="Review not found")
     
-    review.status = request.status
-    review.moderated_at = datetime.utcnow()
-    review.moderated_by = current_admin.id
-    
-    if request.rejection_reason:
-        review.rejection_reason = request.rejection_reason
+    # Convert string status to ReviewStatus enum
+    if request.status == "published":
+        review.status = ReviewStatus.PUBLISHED
+    elif request.status == "rejected":
+        review.status = ReviewStatus.REJECTED
+    else:
+        raise HTTPException(status_code=400, detail="Invalid status. Must be 'published' or 'rejected'")
     
     # Update seller average rating if published
     if request.status == "published":
@@ -551,7 +756,7 @@ async def moderate_seller_review(
             select(func.avg(SellerReview.rating)).where(
                 and_(
                     SellerReview.seller_id == review.seller_id,
-                    SellerReview.status == 'published'
+                    SellerReview.status == ReviewStatus.PUBLISHED
                 )
             )
         )
@@ -567,7 +772,12 @@ async def moderate_seller_review(
     
     await db.commit()
     
+    logger.info(
+        f"Seller review moderated: review_id={review.id}, status={request.status}, "
+        f"admin_id={current_admin.id}"
+    )
+    
     return {
         "id": review.id,
-        "status": review.status
+        "status": request.status
     }

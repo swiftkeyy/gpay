@@ -842,7 +842,14 @@ async def request_withdrawal(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """Request withdrawal."""
+    """Request withdrawal.
+    
+    Requirements: 13.1, 13.2, 13.3, 13.7
+    - Validates seller has sufficient balance
+    - Deducts amount from seller balance
+    - Creates pending withdrawal record
+    - Creates transaction record for withdrawal
+    """
     result = await db.execute(
         select(Seller).where(Seller.user_id == current_user.id)
     )
@@ -854,6 +861,7 @@ async def request_withdrawal(
             detail="Not a seller"
         )
     
+    # Requirement 13.2: Validate sufficient balance
     if seller.balance < request.amount:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -867,12 +875,12 @@ async def request_withdrawal(
             detail="Minimum withdrawal amount is 100 RUB"
         )
     
-    # Deduct amount
+    # Requirement 13.3: Deduct amount from seller balance
+    balance_before = seller.balance
     seller.balance -= request.amount
+    balance_after = seller.balance
     
-    # Create withdrawal
-    from app.models.entities import SellerWithdrawal
-    
+    # Create withdrawal record with pending status
     withdrawal = SellerWithdrawal(
         seller_id=seller.id,
         amount=request.amount,
@@ -882,15 +890,45 @@ async def request_withdrawal(
     )
     db.add(withdrawal)
     
+    # Flush to get withdrawal ID
+    await db.flush()
+    
+    # Requirement 13.7: Create transaction record for withdrawal
+    from app.models.enums import TransactionType, TransactionStatus
+    
+    transaction = Transaction(
+        user_id=current_user.id,
+        transaction_type=TransactionType.WITHDRAWAL,
+        amount=-request.amount,  # Negative because it's leaving the account
+        currency_code="RUB",
+        status=TransactionStatus.PENDING,
+        balance_before=balance_before,
+        balance_after=balance_after,
+        description=f"Withdrawal request #{withdrawal.id} via {request.payment_method}",
+        reference_type="withdrawal",
+        reference_id=withdrawal.id,
+        metadata_json={
+            "withdrawal_id": withdrawal.id,
+            "payment_method": request.payment_method,
+            "payment_details": request.payment_details[:50]  # Store partial details for reference
+        }
+    )
+    db.add(transaction)
+    
     await db.commit()
     await db.refresh(withdrawal)
+    await db.refresh(transaction)
     
-    logger.info(f"Withdrawal requested: withdrawal_id={withdrawal.id}, seller_id={seller.id}, amount={request.amount}")
+    logger.info(
+        f"Withdrawal requested: withdrawal_id={withdrawal.id}, seller_id={seller.id}, "
+        f"amount={request.amount}, transaction_id={transaction.id}"
+    )
     
     return {
         "withdrawal_id": withdrawal.id,
         "amount": float(request.amount),
         "status": "pending",
+        "transaction_id": transaction.id,
         "message": "Withdrawal request submitted"
     }
 
@@ -940,4 +978,58 @@ async def get_withdrawals(
         "total": len(withdrawals),
         "skip": skip,
         "limit": limit
+    }
+
+
+@router.get("/me/balance")
+async def get_seller_balance(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get seller balance breakdown.
+    
+    Requirements: 13.6
+    - Display available balance
+    - Display pending withdrawals
+    - Display escrow held
+    """
+    result = await db.execute(
+        select(Seller).where(Seller.user_id == current_user.id)
+    )
+    seller = result.scalar_one_or_none()
+    
+    if not seller:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Not a seller"
+        )
+    
+    # Calculate pending withdrawals
+    result = await db.execute(
+        select(func.coalesce(func.sum(SellerWithdrawal.amount), 0)).where(
+            and_(
+                SellerWithdrawal.seller_id == seller.id,
+                SellerWithdrawal.status == 'pending'
+            )
+        )
+    )
+    pending_withdrawals = result.scalar()
+    
+    # Calculate in_escrow from active deals
+    result = await db.execute(
+        select(func.coalesce(func.sum(Deal.seller_amount), 0)).where(
+            and_(
+                Deal.seller_id == seller.id,
+                Deal.status.in_(['paid', 'in_progress', 'waiting_confirmation']),
+                Deal.escrow_released == False
+            )
+        )
+    )
+    in_escrow = result.scalar()
+    
+    return {
+        "available_balance": float(seller.balance),
+        "pending_withdrawals": float(pending_withdrawals),
+        "in_escrow": float(in_escrow),
+        "currency": "RUB"
     }

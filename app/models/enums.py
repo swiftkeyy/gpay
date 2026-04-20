@@ -143,6 +143,7 @@ class TransactionType(StrEnum):
     BONUS = "bonus"
     PENALTY = "penalty"
     BOOST = "boost"
+    REFERRAL_REWARD = "referral_reward"
 
 
 class TransactionStatus(StrEnum):
@@ -177,6 +178,8 @@ class NotificationType(StrEnum):
     PRICE_ALERT = "price_alert"
     SELLER_APPROVED = "seller_approved"
     SELLER_REJECTED = "seller_rejected"
+    DISPUTE_OPENED = "dispute_opened"
+    DISPUTE_RESOLVED = "dispute_resolved"
 
 
 class LotStockStatus(StrEnum):

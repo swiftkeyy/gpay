@@ -16,7 +16,7 @@ from app.models.entities import (
     Deal, DealMessage, DealDispute, Lot, User, Seller, Transaction
 )
 from app.models.enums import (
-    DealStatus, TransactionType, TransactionStatus
+    DealStatus, TransactionType, TransactionStatus, DisputeStatus
 )
 
 router = APIRouter()
@@ -127,7 +127,12 @@ async def deliver_goods(
     user_id: int = 1,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Seller delivers goods manually."""
+    """Seller delivers goods manually.
+    
+    Validates: Requirements 8.4, 8.9
+    - 8.4: Update deal status to waiting_confirmation when seller delivers
+    - 8.9: Set auto-completion timeout to 72 hours after delivery
+    """
     # Get deal
     result = await session.execute(
         select(Deal).where(Deal.id == deal_id)
@@ -148,11 +153,36 @@ async def deliver_goods(
             detail=f"Cannot deliver goods for deal with status: {deal.status.value}"
         )
     
-    # Update deal
+    # Update deal (Requirement 8.4)
     deal.status = DealStatus.WAITING_CONFIRMATION
+    deal.delivered_at = datetime.utcnow()
+    
+    # Set auto-completion timeout to 72 hours after delivery (Requirement 8.9)
+    deal.auto_complete_at = datetime.utcnow() + timedelta(hours=72)
     deal.updated_at = datetime.utcnow()
     
-    # TODO: Store delivery_data securely
+    # Store delivery data in deal message
+    if request.delivery_data:
+        delivery_message = DealMessage(
+            deal_id=deal.id,
+            sender_id=user_id,
+            message_text=f"Delivery data: {request.delivery_data}",
+            is_system=True,
+            is_read=False
+        )
+        session.add(delivery_message)
+    
+    # Add comment if provided
+    if request.comment:
+        comment_message = DealMessage(
+            deal_id=deal.id,
+            sender_id=user_id,
+            message_text=request.comment,
+            is_system=False,
+            is_read=False
+        )
+        session.add(comment_message)
+    
     # TODO: Send notification to buyer
     
     await session.commit()
@@ -160,7 +190,8 @@ async def deliver_goods(
     return {
         "message": "Goods delivered, waiting for buyer confirmation",
         "deal_id": deal_id,
-        "status": deal.status.value
+        "status": deal.status.value,
+        "auto_complete_at": deal.auto_complete_at.isoformat()
     }
 
 
@@ -171,7 +202,13 @@ async def confirm_delivery(
     user_id: int = 1,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Buyer confirms delivery and releases escrow."""
+    """Buyer confirms delivery and releases escrow.
+    
+    Validates: Requirements 8.5, 8.7, 8.8
+    - 8.5: Release escrow funds to seller balance minus commission when buyer confirms
+    - 8.7: Calculate commission amount and seller amount according to seller commission percentage
+    - 8.8: Create transaction records for seller payment and commission deduction
+    """
     # Get deal
     result = await session.execute(
         select(Deal).where(Deal.id == deal_id)
@@ -199,7 +236,7 @@ async def confirm_delivery(
     deal.buyer_confirmed_at = datetime.utcnow()
     deal.updated_at = datetime.utcnow()
     
-    # Release escrow
+    # Release escrow (Requirements 8.5, 8.7, 8.8)
     await _release_escrow(deal, session)
     
     # TODO: Create review if rating provided
@@ -220,7 +257,13 @@ async def open_dispute(
     user_id: int = 1,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Open dispute for deal."""
+    """Open dispute for deal.
+    
+    Validates: Requirements 10.1, 10.2, 10.3
+    - 10.1: Create dispute record with initiator, reason, and timestamp
+    - 10.2: Update deal status to dispute and prevent automatic completion
+    - 10.3: Notify admin via notification system
+    """
     # Get deal
     result = await session.execute(
         select(Deal).where(Deal.id == deal_id)
@@ -246,7 +289,7 @@ async def open_dispute(
         select(DealDispute).where(
             and_(
                 DealDispute.deal_id == deal_id,
-                DealDispute.status == "open"
+                DealDispute.status == DisputeStatus.OPEN
             )
         )
     )
@@ -255,21 +298,42 @@ async def open_dispute(
     if existing_dispute:
         raise HTTPException(status_code=400, detail="Dispute already exists for this deal")
     
-    # Create dispute
+    # Create dispute (Requirement 10.1)
     dispute = DealDispute(
         deal_id=deal_id,
         initiator_id=user_id,
         reason=request.reason,
         description=request.description,
-        status="open"
+        status=DisputeStatus.OPEN
     )
     session.add(dispute)
     
-    # Update deal status
+    # Update deal status to dispute and prevent auto-completion (Requirement 10.2)
     deal.status = DealStatus.DISPUTE
+    deal.auto_complete_at = None  # Prevent automatic completion
     deal.updated_at = datetime.utcnow()
     
-    # TODO: Notify admin
+    # Notify admin (Requirement 10.3)
+    from app.models.entities import Notification, Admin
+    from app.models.enums import NotificationType
+    
+    # Get all active admins
+    result = await session.execute(
+        select(Admin).where(Admin.is_active == True)
+    )
+    admins = result.scalars().all()
+    
+    # Create notification for each admin
+    for admin in admins:
+        notification = Notification(
+            user_id=admin.user_id,
+            notification_type=NotificationType.DISPUTE_OPENED,
+            title="New Dispute Opened",
+            message=f"A dispute has been opened for deal #{deal_id}. Reason: {request.reason}",
+            reference_type="dispute",
+            reference_id=dispute.id
+        )
+        session.add(notification)
     
     await session.commit()
     
@@ -330,7 +394,15 @@ async def resolve_dispute(
     user_id: int = 1,
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Admin resolves dispute."""
+    """Admin resolves dispute.
+    
+    Validates: Requirements 10.4, 10.5, 10.6, 10.7, 10.8
+    - 10.4: Provide access to deal details, chat history, and user information
+    - 10.5: Allow choosing resolution: release to seller, refund to buyer, or partial refund
+    - 10.6: Release escrow to seller balance when resolved with seller payment
+    - 10.7: Refund escrow to buyer balance when resolved with buyer refund
+    - 10.8: Update dispute status to resolved and record admin decision
+    """
     from app.models import Admin
     
     # Check if user is admin
@@ -342,7 +414,7 @@ async def resolve_dispute(
     if not admin:
         raise HTTPException(status_code=403, detail="Admin access required")
     
-    # Get dispute with deal
+    # Get dispute with deal (Requirement 10.4 - access to deal details)
     result = await session.execute(
         select(DealDispute)
         .options(selectinload(DealDispute.deal))
@@ -353,20 +425,20 @@ async def resolve_dispute(
     if not dispute:
         raise HTTPException(status_code=404, detail="Dispute not found")
     
-    if dispute.status != "open":
+    if dispute.status != DisputeStatus.OPEN:
         raise HTTPException(status_code=400, detail="Dispute is already resolved")
     
     deal = dispute.deal
     
-    # Process resolution
+    # Process resolution (Requirement 10.5 - allow choosing resolution)
     if request.resolution == "release_to_seller":
-        # Release escrow to seller
+        # Release escrow to seller (Requirement 10.6)
         await _release_escrow(deal, session)
         deal.status = DealStatus.COMPLETED
         deal.completed_at = datetime.utcnow()
         
     elif request.resolution == "refund_to_buyer":
-        # Refund to buyer
+        # Refund to buyer (Requirement 10.7)
         await _refund_to_buyer(deal, session)
         deal.status = DealStatus.REFUNDED
         
@@ -382,16 +454,47 @@ async def resolve_dispute(
     else:
         raise HTTPException(status_code=400, detail=f"Unknown resolution: {request.resolution}")
     
-    # Update dispute
-    dispute.status = "resolved"
+    # Update dispute (Requirement 10.8 - update status to resolved and record admin decision)
+    dispute.status = DisputeStatus.RESOLVED
     dispute.resolution = request.resolution
     dispute.admin_comment = request.comment
     dispute.resolved_at = datetime.utcnow()
-    dispute.resolved_by_id = user_id
+    dispute.resolved_by_id = admin.id
+    dispute.admin_id = admin.id
     
     deal.updated_at = datetime.utcnow()
     
-    # TODO: Notify buyer and seller
+    # Notify buyer and seller
+    from app.models.entities import Notification
+    from app.models.enums import NotificationType
+    
+    # Notify buyer
+    buyer_notification = Notification(
+        user_id=deal.buyer_id,
+        notification_type=NotificationType.DISPUTE_RESOLVED,
+        title="Dispute Resolved",
+        message=f"Your dispute for deal #{deal.id} has been resolved. Resolution: {request.resolution}",
+        reference_type="dispute",
+        reference_id=dispute.id
+    )
+    session.add(buyer_notification)
+    
+    # Notify seller (get seller's user_id)
+    result = await session.execute(
+        select(Seller).where(Seller.id == deal.seller_id)
+    )
+    seller = result.scalar_one_or_none()
+    
+    if seller:
+        seller_notification = Notification(
+            user_id=seller.user_id,
+            notification_type=NotificationType.DISPUTE_RESOLVED,
+            title="Dispute Resolved",
+            message=f"The dispute for deal #{deal.id} has been resolved. Resolution: {request.resolution}",
+            reference_type="dispute",
+            reference_id=dispute.id
+        )
+        session.add(seller_notification)
     
     await session.commit()
     
@@ -403,7 +506,12 @@ async def resolve_dispute(
 
 
 async def _release_escrow(deal: Deal, session: AsyncSession):
-    """Release escrow funds to seller."""
+    """Release escrow funds to seller.
+    
+    Validates: Requirements 8.7, 8.8
+    - 8.7: Calculate commission amount and seller amount according to seller commission percentage
+    - 8.8: Create transaction records for seller payment and commission deduction
+    """
     if deal.escrow_released:
         return
     
@@ -425,11 +533,11 @@ async def _release_escrow(deal: Deal, session: AsyncSession):
     if not user:
         return
     
-    # Add funds to seller balance
+    # Add funds to seller balance (Requirement 8.7)
     old_balance = user.balance
     user.balance += deal.seller_amount
     
-    # Create transaction for seller
+    # Create transaction for seller payment (Requirement 8.8)
     seller_transaction = Transaction(
         user_id=user.id,
         transaction_type=TransactionType.SALE,
@@ -444,7 +552,7 @@ async def _release_escrow(deal: Deal, session: AsyncSession):
     )
     session.add(seller_transaction)
     
-    # Create transaction for commission
+    # Create transaction for commission deduction (Requirement 8.8)
     commission_transaction = Transaction(
         user_id=user.id,
         transaction_type=TransactionType.COMMISSION,
@@ -452,7 +560,7 @@ async def _release_escrow(deal: Deal, session: AsyncSession):
         currency_code="RUB",
         status=TransactionStatus.COMPLETED,
         balance_before=user.balance,
-        balance_after=user.balance,
+        balance_after=user.balance,  # Already deducted from seller_amount
         description=f"Commission for deal #{deal.id}",
         reference_type="deal",
         reference_id=deal.id
@@ -568,8 +676,15 @@ async def _partial_refund(deal: Deal, refund_amount: Decimal, session: AsyncSess
 async def auto_complete_deals(
     session: AsyncSession = Depends(get_db_session)
 ):
-    """Auto-complete deals after timeout (cron job)."""
-    # Get deals waiting for confirmation that passed auto_complete_at
+    """Auto-complete deals after timeout (cron job).
+    
+    Validates: Requirements 8.6, 8.7, 8.8, 8.9
+    - 8.6: Automatically release escrow and complete deal when timeout is reached
+    - 8.7: Calculate commission amount and seller amount according to seller commission percentage
+    - 8.8: Create transaction records for seller payment and commission deduction
+    - 8.9: Auto-completion timeout is 72 hours after delivery
+    """
+    # Get deals waiting for confirmation that passed auto_complete_at (Requirement 8.6)
     result = await session.execute(
         select(Deal).where(
             and_(
@@ -584,13 +699,13 @@ async def auto_complete_deals(
     completed_count = 0
     
     for deal in deals:
-        # Auto-complete
+        # Auto-complete (Requirement 8.6)
         deal.status = DealStatus.COMPLETED
         deal.completed_at = datetime.utcnow()
         deal.buyer_confirmed = False  # Auto-completed, not manually confirmed
         deal.updated_at = datetime.utcnow()
         
-        # Release escrow
+        # Release escrow (Requirements 8.7, 8.8)
         await _release_escrow(deal, session)
         
         completed_count += 1

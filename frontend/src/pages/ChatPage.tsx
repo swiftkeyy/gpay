@@ -40,6 +40,8 @@ export default function ChatPage() {
   const [isConnected, setIsConnected] = useState(false)
   const [reconnectAttempts, setReconnectAttempts] = useState(0)
   const [messageQueue, setMessageQueue] = useState<string[]>([])
+  const [lastMessageId, setLastMessageId] = useState<number | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
   
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const typingTimeoutRef = useRef<number>()
@@ -60,6 +62,13 @@ export default function ChatPage() {
         ])
         setDeal(dealRes.data)
         setMessages(messagesRes.data.items || [])
+        
+        // Track the last message ID for reconnection sync
+        const msgs = messagesRes.data.items || []
+        if (msgs.length > 0) {
+          const lastMsg = msgs[msgs.length - 1]
+          setLastMessageId(lastMsg.id)
+        }
       } catch (error) {
         console.error('Fetch deal error:', error)
         showToast(t('errors.notFound'), 'error')
@@ -81,21 +90,61 @@ export default function ChatPage() {
         console.log('WebSocket connected')
         setIsConnected(true)
         setReconnectAttempts(0)
-        
-        // Send queued messages
-        if (messageQueue.length > 0) {
-          messageQueue.forEach(msg => {
-            websocket.send(msg)
-          })
-          setMessageQueue([])
-        }
       }
 
       websocket.onmessage = (event) => {
         const data = JSON.parse(event.data)
         
-        if (data.type === 'message') {
-          setMessages(prev => [...prev, data])
+        if (data.type === 'connected') {
+          console.log('Connection confirmed, last_message_id:', data.last_message_id)
+          
+          // Request missed messages if we have a last known message ID
+          if (lastMessageId && lastMessageId < data.last_message_id) {
+            setIsSyncing(true)
+            websocket.send(JSON.stringify({
+              type: 'get_missed_messages',
+              last_message_id: lastMessageId
+            }))
+          } else {
+            // Send queued messages immediately if no sync needed
+            if (messageQueue.length > 0) {
+              messageQueue.forEach(msg => {
+                websocket.send(msg)
+              })
+              setMessageQueue([])
+            }
+          }
+        } else if (data.type === 'sync_complete') {
+          console.log(`Sync complete, received ${data.count} missed messages`)
+          setIsSyncing(false)
+          
+          // Now send queued messages
+          if (messageQueue.length > 0) {
+            messageQueue.forEach(msg => {
+              websocket.send(msg)
+            })
+            setMessageQueue([])
+          }
+        } else if (data.type === 'message') {
+          setMessages(prev => {
+            // Avoid duplicates
+            if (prev.some(m => m.id === data.message_id)) {
+              return prev
+            }
+            return [...prev, {
+              id: data.message_id,
+              sender_id: data.sender_id,
+              content: data.message_text,
+              message_type: 'text',
+              is_read: data.is_read,
+              created_at: data.created_at
+            }]
+          })
+          
+          // Update last message ID
+          if (data.message_id) {
+            setLastMessageId(data.message_id)
+          }
           
           // Mark as read if from other user
           if (data.sender_id !== user?.id) {
@@ -160,6 +209,7 @@ export default function ChatPage() {
         clearTimeout(typingTimeoutRef.current)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealId, token, reconnectAttempts, user?.id, showToast, t])
 
   // Auto-scroll to bottom
@@ -238,6 +288,9 @@ export default function ChatPage() {
             <h1 className="font-semibold">💬 {t('chat.title')}</h1>
             {!isConnected && (
               <div className="text-xs text-red-500">{t('chat.reconnecting')}</div>
+            )}
+            {isSyncing && (
+              <div className="text-xs text-blue-500">{t('chat.syncing')}</div>
             )}
             {isTyping && (
               <div className="text-xs text-gray-500">{t('chat.typing')}</div>
@@ -346,12 +399,12 @@ export default function ChatPage() {
             }}
             onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
             placeholder={t('chat.messagePlaceholder')}
-            disabled={!isConnected}
+            disabled={!isConnected || isSyncing}
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50"
           />
           <button
             onClick={sendMessage}
-            disabled={!input.trim() || !isConnected}
+            disabled={!input.trim() || !isConnected || isSyncing}
             className="bg-tg-button text-tg-button-text px-6 py-2 rounded-lg font-semibold disabled:opacity-50"
           >
             ➤

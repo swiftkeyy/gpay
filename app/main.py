@@ -341,6 +341,11 @@ async def main() -> None:
         token=settings.bot_token,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
+    
+    # Initialize bot notification service
+    from app.services.bot_notifications import set_bot_instance
+    set_bot_instance(bot)
+    logger.info("Bot notification service initialized")
 
     redis = Redis.from_url(settings.redis_url)
     storage = RedisStorage(redis=redis)

@@ -377,7 +377,6 @@ export default function HomePage() {
                   rating={lot.rating}
                   delivery_type={lot.delivery_type}
                   stock_count={lot.stock_count}
-                  is_featured={lot.is_featured}
                   onAddToCart={(e) => handleAddToCart(lot.id, e)}
                 />
               ))}

@@ -127,6 +127,7 @@
     "title": "Chat",
     "typing": "typing...",
     "reconnecting": "Reconnecting...",
+    "syncing": "Syncing messages...",
     "connectionLost": "Connection lost",
     "sendMessage": "Send",
     "messagePlaceholder": "Message...",
