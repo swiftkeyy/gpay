@@ -99,7 +99,7 @@ class Settings(BaseSettings):
     jwt_expiration_minutes: int = Field(43200, alias="JWT_EXPIRATION_MINUTES")  # 30 days
     
     # WebApp URL for Mini App
-    webapp_url: str = Field("https://gpay-production.up.railway.app", alias="WEBAPP_URL")
+    webapp_url: str = Field("https://t.me/GamePay_marketbot/app", alias="WEBAPP_URL")
     
     # CORS settings
     cors_origins: str = Field("*", alias="CORS_ORIGINS")
